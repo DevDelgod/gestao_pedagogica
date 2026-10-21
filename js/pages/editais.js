@@ -78,7 +78,7 @@ function editalHtml(e) {
     <article class="cartao item" data-id="${escapar(e.id)}">
       <div class="item__principal">
         <h2 class="item__titulo">${escapar(e.titulo)} <span class="selo ${SELO_STATUS[e.status]}">${ROTULO_STATUS_EDITAL[e.status]}</span></h2>
-        <p class="item__meta"><strong>${ROTULO_MODALIDADE[e.modalidade]}</strong>${e.config.listaEspera ? ' · com lista de espera' : ' · sem lista de espera'}</p>
+        <p class="item__meta"><strong>${ROTULO_MODALIDADE[e.modalidade]}</strong>${e.config.listaRemanescentes ? ' · com lista de remanescentes' : ' · sem lista de remanescentes'}</p>
         <p class="item__meta">Inscrições: ${formatarDataHora(e.inscricoesInicio)} a ${formatarDataHora(e.inscricoesFim)}${resultado}</p>
         <p class="item__meta">Turmas: ${e.turmas.map((t) => escapar(t.nome)).join(', ')}</p>
         <p class="item__meta">Requisitos de matrícula: ${requisitos} · prazo de ${e.config.prazoMatriculaDias} dia(s) após a convocação</p>
@@ -138,7 +138,7 @@ function sincronizarModalidade() {
   const modalidade = selModalidade.value;
   $('#ed-modalidade-ajuda').textContent = AJUDA_MODALIDADE[modalidade];
   $$('[data-so="prova"]').forEach((el) => (el.hidden = modalidade !== MODALIDADE_SELECAO.PROVA));
-  $('#ed-lista-espera').closest('.check').hidden = modalidade === MODALIDADE_SELECAO.ANALISE;
+  $('#ed-lista-remanescentes').closest('.check').hidden = modalidade === MODALIDADE_SELECAO.ANALISE;
 }
 selModalidade.addEventListener('change', sincronizarModalidade);
 
@@ -204,7 +204,7 @@ async function abrirFormulario(edital = null) {
   $('#ed-inicio').value = paraInputDataHora(edital?.inscricoesInicio);
   $('#ed-fim').value = paraInputDataHora(edital?.inscricoesFim);
   $('#ed-resultado').value = edital?.dataResultado ?? '';
-  $('#ed-lista-espera').checked = edital?.config.listaEspera ?? true;
+  $('#ed-lista-remanescentes').checked = edital?.config.listaRemanescentes ?? true;
   $('#ed-prazo').value = edital?.config.prazoMatriculaDias ?? 5;
   $('#ed-nota-min').value = edital?.config.notaMinima ?? 0;
   $('#ed-nota-max').value = edital?.config.notaMaxima ?? 10;
@@ -262,7 +262,7 @@ form.addEventListener('submit', async (evento) => {
     turmas,
     requisitosMatricula: estado.requisitos,
     config: {
-      listaEspera: selModalidade.value === MODALIDADE_SELECAO.ANALISE ? false : $('#ed-lista-espera').checked,
+      listaRemanescentes: selModalidade.value === MODALIDADE_SELECAO.ANALISE ? false : $('#ed-lista-remanescentes').checked,
       prazoMatriculaDias: Number($('#ed-prazo').value),
       notaMinima: Number($('#ed-nota-min').value) || 0,
       notaMaxima: Number($('#ed-nota-max').value) || 10,

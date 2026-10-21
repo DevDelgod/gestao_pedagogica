@@ -73,8 +73,8 @@ Tudo gira em torno do **edital**, que define como a instituição trabalha:
 
 1. **Edital** (rascunho): título, turmas ofertadas, janela de inscrição, data do resultado, **modalidade** de seleção (sorteio, prova, ordem de inscrição ou análise individual) e **requisitos de matrícula** (documentos, pagamento…).
 2. **Inscrições abertas:** o formulário do site recebe inscrições, só dentro da janela de datas e para as turmas ofertadas.
-3. **Seleção:** com as inscrições encerradas, a equipe executa o sorteio (ou a classificação) por turma. Os escolhidos são **convocados** e reservam vaga; o restante vira lista de espera. O sorteio fica registrado com a semente e pode ser conferido por qualquer pessoa.
-4. **Matrículas:** a equipe marca os requisitos cumpridos de cada convocado e efetiva a matrícula. Quem desiste ou perde o prazo libera a vaga, e o próximo suplente é chamado.
+3. **Seleção:** com as inscrições encerradas, a equipe executa o sorteio (ou a classificação) por turma. Os escolhidos são **convocados** e reservam vaga; o restante vira lista de remanescentes. O sorteio fica registrado com a semente e pode ser conferido por qualquer pessoa.
+4. **Matrículas:** a equipe marca os requisitos cumpridos de cada convocado e efetiva a matrícula. Quem desiste ou perde o prazo libera a vaga, e o próximo remanescente é chamado.
 
 Detalhes e justificativas em [`docs/modelo-de-dados.md`](docs/modelo-de-dados.md).
 

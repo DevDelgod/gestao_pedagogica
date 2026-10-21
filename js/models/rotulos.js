@@ -33,7 +33,7 @@ export const ROTULO_AVANCAR_EDITAL = Object.freeze({
 export const ROTULO_STATUS_INSCRICAO = Object.freeze({
   inscrita: 'Inscrita',
   convocada: 'Convocada',
-  suplente: 'Suplente',
+  remanescente: 'Remanescente',
   matriculada: 'Matriculada',
   nao_selecionada: 'Não selecionada',
   indeferida: 'Indeferida',

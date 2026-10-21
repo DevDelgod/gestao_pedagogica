@@ -3,7 +3,7 @@
  *
  * Numa única transação:
  *   - convoca os primeiros N (N = vagas livres da turma) e reserva essas vagas;
- *   - põe o resto na lista de espera (se o edital permitir) ou como não selecionado;
+ *   - põe o resto na lista de remanescentes (se o edital permitir) ou como não selecionado;
  *   - grava um registro auditável em selecoes/{editalId_turmaId}.
  * Só pode rodar UMA vez por turma e só com o edital na etapa "Em seleção" (inscrições encerradas).
  */
@@ -40,7 +40,7 @@ export const obterSelecao = (editalId, turmaId) => selecoesRepo.obter(idSelecao(
  * @param {{ editalId: string, turmaId: string, semente?: string }} opcoes
  *   semente: só vale para sorteio. Em branco, o sistema gera uma. Pode ser um dado público
  *   (ex.: números de uma extração da Loteria Federal) para dar transparência ao sorteio.
- * @returns {Promise<{ convocados: number, suplentes: number, naoSelecionados: number, semente: string|null }>}
+ * @returns {Promise<{ convocados: number, remanescentes: number, naoSelecionados: number, semente: string|null }>}
  */
 export async function executarSelecao({ editalId, turmaId, semente }) {
   // Os ids dos candidatos são buscados antes (sem consulta dentro de transação); a transação
@@ -121,8 +121,8 @@ export async function executarSelecaoNaTransacao(tx, { editalId, turmaId, candid
     semente,
     notaMinima: edital.config?.notaMinima ?? 0,
   });
-  const listaEspera = edital.config?.listaEspera ?? true;
-  const resultado = distribuirVagas(classificacao, vagas, { listaEspera });
+  const listaRemanescentes = edital.config?.listaRemanescentes ?? true;
+  const resultado = distribuirVagas(classificacao, vagas, { listaRemanescentes });
 
   // --- escritas ---
   const refDe = (id) => inscricaoRefs[candidatoIds.indexOf(id)];
@@ -133,8 +133,8 @@ export async function executarSelecaoNaTransacao(tx, { editalId, turmaId, candid
       selecao: { modalidade, posicao: i + 1 },
     });
   });
-  resultado.suplentes.forEach((id, i) => {
-    tx.update(refDe(id), { status: S.SUPLENTE, posicaoSuplencia: i + 1, atualizadoEm: serverTimestamp() });
+  resultado.remanescentes.forEach((id, i) => {
+    tx.update(refDe(id), { status: S.REMANESCENTE, posicaoRemanescente: i + 1, atualizadoEm: serverTimestamp() });
   });
   resultado.naoSelecionados.forEach((id) => {
     tx.update(refDe(id), {
@@ -159,11 +159,11 @@ export async function executarSelecaoNaTransacao(tx, { editalId, turmaId, candid
     semente: sorteio ? semente : null,
     algoritmo: sorteio ? ALGORITMO_SORTEIO : modalidade,
     vagasLivres: vagas,
-    listaEspera,
+    listaRemanescentes,
     notaMinima: modalidade === MODALIDADE_SELECAO.PROVA ? (edital.config?.notaMinima ?? 0) : null,
     candidatos: candidatos.map((c) => c.id).sort(), // base do sorteio: ids em ordem alfabética
     convocados: resultado.convocados, // na ordem do resultado
-    suplentes: resultado.suplentes,
+    remanescentes: resultado.remanescentes,
     naoSelecionados: resultado.naoSelecionados,
     executadaPor,
     executadaEm: serverTimestamp(),
@@ -171,7 +171,7 @@ export async function executarSelecaoNaTransacao(tx, { editalId, turmaId, candid
 
   return {
     convocados: resultado.convocados.length,
-    suplentes: resultado.suplentes.length,
+    remanescentes: resultado.remanescentes.length,
     naoSelecionados: resultado.naoSelecionados.length,
     semente: sorteio ? semente : null,
   };

@@ -2,7 +2,7 @@
  * Serviço do módulo Inscrições: tudo o que acontece com uma inscrição depois que ela chega.
  *
  *   inscrita ─(seleção, ver selecao.service.js)─▶ convocada ─(requisitos ok)─▶ matriculada
- *      │ └─ suplente ─(vaga liberada)─▶ convocada            └─ desistente (a vaga volta)
+ *      │ └─ remanescente ─(vaga liberada)─▶ convocada            └─ desistente (a vaga volta)
  *      └─ indeferida
  *
  * Toda mudança que mexe em vagas é uma transação, para os contadores da turma nunca divergirem
@@ -59,14 +59,14 @@ export function enviarInscricaoPublica(dados) {
 export const listarInscricoesDoEdital = (editalId) =>
   inscricoesRepo.listar(where('editalId', '==', editalId));
 
-/** Lista de espera de uma turma, na ordem de chamada. */
-export async function listarSuplentes(editalId, turmaId) {
-  const suplentes = await inscricoesRepo.listar(
+/** Lista de remanescentes de uma turma, na ordem de chamada. */
+export async function listarRemanescentes(editalId, turmaId) {
+  const remanescentes = await inscricoesRepo.listar(
     where('editalId', '==', editalId),
     where('turmaId', '==', turmaId),
-    where('status', '==', S.SUPLENTE),
+    where('status', '==', S.REMANESCENTE),
   );
-  return suplentes.sort((a, b) => a.posicaoSuplencia - b.posicaoSuplencia);
+  return remanescentes.sort((a, b) => a.posicaoRemanescente - b.posicaoRemanescente);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ export function camposDeConvocacao(edital, hoje) {
     status: S.CONVOCADA,
     convocadaEm: serverTimestamp(),
     prazoMatricula: somarDias(hoje, edital.config?.prazoMatriculaDias ?? 5),
-    posicaoSuplencia: null,
+    posicaoRemanescente: null,
     requisitos: Object.fromEntries(
       (edital.requisitosMatricula ?? []).map((r) => [r.id, { rotulo: r.rotulo, tipo: r.tipo, cumprido: false }]),
     ),
@@ -110,13 +110,13 @@ export function camposDeConvocacao(edital, hoje) {
 }
 
 // ---------------------------------------------------------------------------
-// Convocar (individual: análise manual, ou chamada de suplente)
+// Convocar (individual: análise manual, ou chamada de remanescente)
 // ---------------------------------------------------------------------------
 
 export async function convocarNaTransacao(tx, { inscricaoId, hoje }) {
   const inscricaoRef = doc(db, COLECOES.INSCRICOES, inscricaoId);
   const inscricaoSnap = await tx.get(inscricaoRef);
-  const inscricao = lerInscricao(inscricaoSnap, [S.INSCRITA, S.SUPLENTE]);
+  const inscricao = lerInscricao(inscricaoSnap, [S.INSCRITA, S.REMANESCENTE]);
 
   const turmaRef = doc(db, COLECOES.TURMAS, inscricao.turmaId);
   const editalRef = doc(db, COLECOES.EDITAIS, inscricao.editalId);
@@ -145,12 +145,12 @@ export async function convocarNaTransacao(tx, { inscricaoId, hoje }) {
 export const convocarInscricao = (inscricaoId) =>
   runTransaction(db, (tx) => convocarNaTransacao(tx, { inscricaoId, hoje: hojeISO() }));
 
-/** Chama o primeiro da lista de espera quando há vaga livre. */
-export async function convocarProximoSuplente({ editalId, turmaId }) {
-  // O suplente é procurado antes (o Firestore não permite consulta dentro de transação);
-  // a transação confirma que ele continua suplente e que ainda há vaga.
-  const [proximo] = await listarSuplentes(editalId, turmaId);
-  if (!proximo) throw new ErroDeNegocio('sem-suplentes', 'Não há suplentes nesta turma.');
+/** Chama o primeiro da lista de remanescentes quando há vaga livre. */
+export async function convocarProximoRemanescente({ editalId, turmaId }) {
+  // O remanescente é procurado antes (o Firestore não permite consulta dentro de transação);
+  // a transação confirma que ele continua remanescente e que ainda há vaga.
+  const [proximo] = await listarRemanescentes(editalId, turmaId);
+  if (!proximo) throw new ErroDeNegocio('sem-remanescentes', 'Não há remanescentes nesta turma.');
   await convocarInscricao(proximo.id);
   return proximo;
 }
@@ -299,7 +299,7 @@ export const desistirDaVaga = (inscricaoId, motivo = '') =>
 export function indeferirInscricao(inscricaoId, motivo = '') {
   const ref = doc(db, COLECOES.INSCRICOES, inscricaoId);
   return runTransaction(db, async (tx) => {
-    lerInscricao(await tx.get(ref), [S.INSCRITA, S.SUPLENTE]);
+    lerInscricao(await tx.get(ref), [S.INSCRITA, S.REMANESCENTE]);
     tx.update(ref, {
       status: S.INDEFERIDA,
       motivo: motivo.trim(),

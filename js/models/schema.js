@@ -40,15 +40,15 @@ export const PAPEIS = Object.freeze({
 /**
  * Caminho de uma inscrição:
  *   inscrita ─(seleção)─▶ convocada ─(requisitos cumpridos)─▶ matriculada
- *      │                      └─(desistiu / prazo)─▶ desistente   (a vaga volta; chama-se um suplente)
- *      ├──▶ suplente ─(vaga liberada)─▶ convocada
+ *      │                      └─(desistiu / prazo)─▶ desistente   (a vaga volta; chama-se um remanescente)
+ *      ├──▶ remanescente ─(vaga liberada)─▶ convocada
  *      ├──▶ nao_selecionada
  *      └──▶ indeferida (recusada pela equipe)
  */
 export const STATUS_INSCRICAO = Object.freeze({
   INSCRITA: 'inscrita', // recebida; aguarda a seleção
   CONVOCADA: 'convocada', // selecionada: reserva uma vaga e tem prazo para se matricular
-  SUPLENTE: 'suplente', // lista de espera, em ordem (posicaoSuplencia)
+  REMANESCENTE: 'remanescente', // lista de remanescentes, em ordem (posicaoRemanescente)
   MATRICULADA: 'matriculada',
   NAO_SELECIONADA: 'nao_selecionada',
   INDEFERIDA: 'indeferida',
@@ -216,7 +216,7 @@ export const novoEdital = (d) => ({
   turmas: d.turmas ?? [], // [{ id, nome, cursoId, cursoNome }] — cópia para o formulário do site
   requisitosMatricula: d.requisitosMatricula ?? [], // [{ id, tipo, rotulo }]
   config: {
-    listaEspera: d.config?.listaEspera ?? true, // quem não ficou nas vagas vira suplente
+    listaRemanescentes: d.config?.listaRemanescentes ?? true, // quem não ficou nas vagas vira remanescente
     prazoMatriculaDias: d.config?.prazoMatriculaDias ?? 5, // dias para o convocado se matricular
     notaMinima: d.config?.notaMinima ?? 0, // só para modalidade 'prova'
     notaMaxima: d.config?.notaMaxima ?? 10, // só para modalidade 'prova'
@@ -226,7 +226,7 @@ export const novoEdital = (d) => ({
 /**
  * inscricoes/{inscricaoId} — nasce no site (sem login), dentro de um edital e para uma turma.
  * Os campos aceitos na criação pública estão travados em firestore.rules. Os demais
- * (nota, selecao, posicaoSuplencia, prazoMatricula, requisitos, alunoId, matriculaId, motivo…)
+ * (nota, selecao, posicaoRemanescente, prazoMatricula, requisitos, alunoId, matriculaId, motivo…)
  * são acrescentados pela equipe/sistema nas etapas seguintes.
  */
 export const novaInscricao = (d) => ({

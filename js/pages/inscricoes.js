@@ -9,7 +9,7 @@ import { temSelecaoAutomatica, verificarSorteio } from '../domain/selecao.js';
 import { editaisRepo, listarEditais } from '../services/editais.service.js';
 import {
   convocarInscricao,
-  convocarProximoSuplente,
+  convocarProximoRemanescente,
   desistirDaVaga,
   efetivarMatricula,
   indeferirInscricao,
@@ -27,7 +27,7 @@ montarShell({ ativo: 'inscricoes', perfil: eu });
 const ABAS = [
   { id: 'inscrita', rotulo: 'Inscritas', status: [S.INSCRITA], vazio: 'Nenhuma inscrição aguardando seleção.' },
   { id: 'convocada', rotulo: 'Convocadas', status: [S.CONVOCADA], vazio: 'Ninguém convocado aguardando matrícula.' },
-  { id: 'suplente', rotulo: 'Suplentes', status: [S.SUPLENTE], vazio: 'Lista de espera vazia.' },
+  { id: 'remanescente', rotulo: 'Remanescentes', status: [S.REMANESCENTE], vazio: 'Lista de remanescentes vazia.' },
   { id: 'matriculada', rotulo: 'Matriculadas', status: [S.MATRICULADA], vazio: 'Nenhuma matrícula efetivada ainda.' },
   { id: 'encerrada', rotulo: 'Encerradas', status: [S.NAO_SELECIONADA, S.INDEFERIDA, S.DESISTENTE], vazio: 'Nada por aqui.' },
 ];
@@ -195,7 +195,7 @@ function renderizarPainel() {
   const livres = vagasLivres(turma);
   const registro = estado.registros.get(estado.turmaId);
   const daTurma = estado.itens.filter((i) => i.turmaId === estado.turmaId);
-  const suplentes = daTurma.filter((i) => i.status === S.SUPLENTE).length;
+  const remanescentes = daTurma.filter((i) => i.status === S.REMANESCENTE).length;
   const semNota = daTurma.filter((i) => i.status === S.INSCRITA && typeof i.nota !== 'number').length;
 
   const botoes = [];
@@ -205,8 +205,8 @@ function renderizarPainel() {
   if (registro) {
     botoes.push('<button class="botao botao--fantasma" type="button" data-acao="registro">Ver registro da seleção</button>');
   }
-  if (!somenteConsulta() && suplentes > 0 && livres > 0 && [E.SELECAO, E.MATRICULAS].includes(ed.status)) {
-    botoes.push('<button class="botao botao--fantasma" type="button" data-acao="proximo-suplente">Convocar próximo suplente</button>');
+  if (!somenteConsulta() && remanescentes > 0 && livres > 0 && [E.SELECAO, E.MATRICULAS].includes(ed.status)) {
+    botoes.push('<button class="botao botao--fantasma" type="button" data-acao="proximo-remanescente">Convocar próximo remanescente</button>');
   }
   if (ed.modalidade === M.PROVA && ed.status !== E.ENCERRADO && !registro && semNota > 0) {
     avisos.push(`${semNota} inscrito(s) sem nota: ficarão fora da classificação.`);
@@ -230,7 +230,7 @@ function ordenar(aba, itens) {
   const chave = {
     inscrita: (i) => instante(i.criadoEm),
     convocada: (i) => i.selecao?.posicao ?? instante(i.convocadaEm),
-    suplente: (i) => i.posicaoSuplencia ?? 0,
+    remanescente: (i) => i.posicaoRemanescente ?? 0,
     matriculada: (i) => -instante(i.matriculadaEm),
     encerrada: (i) => -instante(i.encerradaEm || i.criadoEm),
   }[aba.id];
@@ -285,10 +285,10 @@ function detalhes(i) {
       };
     }
 
-    case S.SUPLENTE:
+    case S.REMANESCENTE:
       return {
         extra: '',
-        acoes: `<span class="selo selo--neutro">Suplente nº ${i.posicaoSuplencia}</span>${botao('indeferir', 'Indeferir')}`,
+        acoes: `<span class="selo selo--neutro">Remanescente nº ${i.posicaoRemanescente}</span>${botao('indeferir', 'Indeferir')}`,
       };
 
     case S.CONVOCADA: {
@@ -402,7 +402,7 @@ $lista.addEventListener('change', async (evento) => {
 });
 
 // ---------------------------------------------------------------------------
-// Painel da turma: seleção, próximo suplente, registro
+// Painel da turma: seleção, próximo remanescente, registro
 // ---------------------------------------------------------------------------
 $('#painel-turma').addEventListener('click', (evento) => {
   const botao = evento.target.closest('button[data-acao]');
@@ -410,10 +410,10 @@ $('#painel-turma').addEventListener('click', (evento) => {
 
   if (botao.dataset.acao === 'selecionar') return abrirSelecao();
   if (botao.dataset.acao === 'registro') return abrirRegistro(estado.turmaId);
-  if (botao.dataset.acao === 'proximo-suplente') {
+  if (botao.dataset.acao === 'proximo-remanescente') {
     return executar(async () => {
-      const suplente = await convocarProximoSuplente({ editalId: estado.edital.id, turmaId: estado.turmaId });
-      toast(`${suplente.nome} (suplente nº ${suplente.posicaoSuplencia}) foi convocado(a).`, 'sucesso');
+      const remanescente = await convocarProximoRemanescente({ editalId: estado.edital.id, turmaId: estado.turmaId });
+      toast(`${remanescente.nome} (remanescente nº ${remanescente.posicaoRemanescente}) foi convocado(a).`, 'sucesso');
     }, botao);
   }
 });
@@ -474,8 +474,8 @@ function abrirSelecao() {
   const turma = estado.turmas.get(estado.turmaId);
   const candidatos = estado.itens.filter((i) => i.turmaId === estado.turmaId && i.status === S.INSCRITA);
   const livres = Math.max(0, vagasLivres(turma));
-  const lista = ed.config.listaEspera
-    ? 'As demais formarão a lista de espera, na ordem do resultado.'
+  const lista = ed.config.listaRemanescentes
+    ? 'As demais formarão a lista de remanescentes, na ordem do resultado.'
     : 'As demais ficarão como não selecionadas.';
 
   const descricao = {
@@ -506,7 +506,7 @@ $('#form-selecao').addEventListener('submit', async (evento) => {
   try {
     const r = await executarSelecao({ editalId: estado.edital.id, turmaId, semente: $('#selecao-semente').value });
     dlgSelecao.close();
-    toast(`Seleção concluída: ${r.convocados} convocado(s), ${r.suplentes} suplente(s), ${r.naoSelecionados} não selecionado(s).`, 'sucesso');
+    toast(`Seleção concluída: ${r.convocados} convocado(s), ${r.remanescentes} remanescente(s), ${r.naoSelecionados} não selecionado(s).`, 'sucesso');
     await recarregar().then(renderizar, () => {});
     abrirRegistro(turmaId); // mostra a semente e o resultado logo após a execução
   } catch (erro) {
@@ -559,7 +559,7 @@ function abrirRegistro(turmaId) {
     </dl>
     ${verificacao ? `<p>${verificacao}</p>` : ''}
     ${grupo('Convocados', registro.convocados)}
-    ${grupo('Suplentes (em ordem)', registro.suplentes)}
+    ${grupo('Remanescentes (em ordem)', registro.remanescentes)}
     ${grupo('Não selecionados', registro.naoSelecionados)}`;
   $('#dlg-registro').showModal();
 }

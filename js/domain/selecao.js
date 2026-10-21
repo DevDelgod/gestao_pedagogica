@@ -3,7 +3,7 @@
  *
  * Duas etapas separadas, para poder trocar a modalidade sem mexer no resto:
  *   1. ordenarCandidatos(modalidade, …) → quem está APTO e em que ORDEM (e quem foi eliminado e por quê)
- *   2. distribuirVagas(ordem, vagas, …) → os primeiros N são convocados, o resto vira suplente (ou não selecionado)
+ *   2. distribuirVagas(ordem, vagas, …) → os primeiros N são convocados, o resto vira remanescente (ou não selecionado)
  *
  * Para criar uma modalidade nova (ex.: "análise de renda"), acrescente um `case` em
  * ordenarCandidatos. O restante do sistema não muda.
@@ -94,31 +94,31 @@ export function ordenarCandidatos(modalidade, candidatos, { semente, notaMinima 
 /**
  * Auditoria: refaz o sorteio só com o que foi registrado (candidatos, semente, vagas) e confere
  * se dá o mesmo resultado. Qualquer pessoa pode rodar isto com os dados do registro.
- * @param {{ candidatos: string[], semente: string, vagasLivres: number, listaEspera: boolean, convocados: string[], suplentes: string[] }} registro
+ * @param {{ candidatos: string[], semente: string, vagasLivres: number, listaRemanescentes: boolean, convocados: string[], remanescentes: string[] }} registro
  */
-export function verificarSorteio({ candidatos, semente, vagasLivres, listaEspera, convocados, suplentes }) {
+export function verificarSorteio({ candidatos, semente, vagasLivres, listaRemanescentes, convocados, remanescentes }) {
   const classificacao = ordenarCandidatos(
     MODALIDADE_SELECAO.SORTEIO,
     candidatos.map((id) => ({ id, criadoEm: 0 })),
     { semente },
   );
-  const refeito = distribuirVagas(classificacao, vagasLivres, { listaEspera });
+  const refeito = distribuirVagas(classificacao, vagasLivres, { listaRemanescentes });
   const igual = (a, b) => a.length === b.length && a.every((id, i) => id === b[i]);
-  return igual(refeito.convocados, convocados) && igual(refeito.suplentes, suplentes);
+  return igual(refeito.convocados, convocados) && igual(refeito.remanescentes, remanescentes);
 }
 
 /**
  * @param {{ ordem: string[], eliminados: Array<{ id: string, motivo: string }> }} classificacao
  * @param {number} vagas vagas livres na turma
- * @param {{ listaEspera?: boolean }} [opcoes]
+ * @param {{ listaRemanescentes?: boolean }} [opcoes]
  */
-export function distribuirVagas({ ordem, eliminados }, vagas, { listaEspera = true } = {}) {
+export function distribuirVagas({ ordem, eliminados }, vagas, { listaRemanescentes = true } = {}) {
   const convocados = ordem.slice(0, Math.max(0, vagas));
   const restantes = ordem.slice(convocados.length);
   return {
     convocados,
-    suplentes: listaEspera ? restantes : [],
-    naoSelecionados: [...(listaEspera ? [] : restantes), ...eliminados.map((e) => e.id)],
+    remanescentes: listaRemanescentes ? restantes : [],
+    naoSelecionados: [...(listaRemanescentes ? [] : restantes), ...eliminados.map((e) => e.id)],
     motivosEliminacao: Object.fromEntries(eliminados.map((e) => [e.id, e.motivo])),
   };
 }

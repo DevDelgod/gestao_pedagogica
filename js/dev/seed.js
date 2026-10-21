@@ -7,7 +7,7 @@
  */
 
 /** Mude a versão sempre que alterar a semente: os dados de exemplo salvos no navegador são refeitos. */
-export const SEED_VERSAO = 1;
+export const SEED_VERSAO = 2;
 
 export const CONTAS_DEV = [
   {
@@ -109,12 +109,12 @@ export function semear(store, Timestamp) {
       inscricoesInicio: ts(agora + janela[0] * DIA), inscricoesFim: ts(agora + janela[1] * DIA), dataResultado: null,
       turmaIds, turmas: turmaIds.map((t) => { const d = store.get(`turmas/${t}`); return { id: t, nome: d.nome, cursoId: d.cursoId, cursoNome: d.cursoNome }; }),
       requisitosMatricula: requisitos,
-      config: { listaEspera: true, prazoMatriculaDias: 5, notaMinima: 0, notaMaxima: 10 },
+      config: { listaRemanescentes: true, prazoMatriculaDias: 5, notaMinima: 0, notaMaxima: 10 },
       ...auditoria(Math.max(1, 1 - janela[0])), ...extras,
     });
   edital('ed1', 'Edital 01/2026 — Sorteio', 'sorteio', 'selecao', ['t1', 't2'], [-30, -10], { dataResultado: '2026-02-20' });
-  edital('ed2', 'Edital 02/2026 — Prova', 'prova', 'selecao', ['t3'], [-30, -10], { config: { listaEspera: true, prazoMatriculaDias: 5, notaMinima: 5, notaMaxima: 10 } });
-  edital('ed3', 'Edital 03/2026 — Análise individual', 'analise', 'matriculas', ['t4'], [-30, -10], { requisitosMatricula: [], config: { listaEspera: false, prazoMatriculaDias: 3, notaMinima: 0, notaMaxima: 10 } });
+  edital('ed2', 'Edital 02/2026 — Prova', 'prova', 'selecao', ['t3'], [-30, -10], { config: { listaRemanescentes: true, prazoMatriculaDias: 5, notaMinima: 5, notaMaxima: 10 } });
+  edital('ed3', 'Edital 03/2026 — Análise individual', 'analise', 'matriculas', ['t4'], [-30, -10], { requisitosMatricula: [], config: { listaRemanescentes: false, prazoMatriculaDias: 3, notaMinima: 0, notaMaxima: 10 } });
   edital('ed4', 'Edital 04/2026 — Rascunho', 'sorteio', 'rascunho', ['t2'], [5, 20], { descricao: 'Ainda em preparação.', requisitosMatricula: [] });
   edital('ed5', 'Edital 05/2026 — Inscrições abertas', 'sorteio', 'inscricoes', ['t7'], [-2, 10], { dataResultado: '2026-12-15' });
 

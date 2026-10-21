@@ -25,7 +25,7 @@ curso 1───n turma 1───n matrícula n───1 aluno
 
 edital ──oferta──▶ turmas
    └───n inscrição ──(seleção)──▶ convocada ──(requisitos ok)──▶ matrícula (+ aluno)
-                          └─────▶ suplente · não selecionada
+                          └─────▶ remanescente · não selecionada
 ```
 
 ## O processo: inscrição → seleção → matrícula
@@ -39,7 +39,7 @@ Cada **edital** descreve como a instituição trabalha. O sistema não tem um fl
 | `rascunho` | Pode ser editado à vontade. |
 | `inscricoes` | O formulário do site aceita inscrições, **só dentro da janela de datas** e **só para as turmas ofertadas** (conferido pelas regras do Firestore). |
 | `selecao` | Inscrições encerradas. Aqui se executa o sorteio/classificação, uma vez por turma. |
-| `matriculas` | Resultado publicado. Convocados cumprem os requisitos e são matriculados; suplentes são chamados quando abrem vagas. |
+| `matriculas` | Resultado publicado. Convocados cumprem os requisitos e são matriculados; remanescentes são chamados quando abrem vagas. |
 | `encerrado` | Somente consulta. |
 
 **Modalidades de seleção** (`editais.modalidade`):
@@ -53,7 +53,9 @@ Cada **edital** descreve como a instituição trabalha. O sistema não tem um fl
 
 **Requisitos de matrícula** (`editais.requisitosMatricula`): lista livre, ex. *Documentos pessoais* (`documento`), *Taxa de matrícula* (`pagamento`), *Termo assinado* (`termo`). Cada convocado ganha a lista em `inscricoes.requisitos`; a equipe marca cada item como cumprido e **só então** a matrícula pode ser efetivada. Um edital sem requisitos permite matricular direto.
 
-**Situações da inscrição** (`inscricoes.status`): `inscrita` → `convocada` → `matriculada`; ou `suplente`, `nao_selecionada`, `indeferida`, `desistente`.
+**Situações da inscrição** (`inscricoes.status`): `inscrita` → `convocada` → `matriculada`; ou `remanescente`, `nao_selecionada`, `indeferida`, `desistente`.
+
+**Remanescentes** são os inscritos que não ficaram nas vagas da seleção e aguardam numa lista ordenada (`posicaoRemanescente`). Quando uma vaga se libera (desistência ou prazo vencido), o primeiro remanescente é convocado. Cada edital escolhe se forma essa lista (`config.listaRemanescentes`); sem ela, quem não ficou nas vagas vira `nao_selecionada`.
 
 Para suportar uma instituição com outro jeito de trabalhar basta criar um edital com outra modalidade e outros requisitos. Para uma modalidade realmente nova (ex.: análise de renda), acrescente um `case` em `ordenarCandidatos` (`js/domain/selecao.js`): nada mais muda.
 
@@ -71,7 +73,7 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
 | **Datas de calendário como `'AAAA-MM-DD'`** | Evita o bug de "a aula caiu um dia antes" por fuso horário. Só `criadoEm`/`atualizadoEm` usam Timestamp. |
 | **Contagens do painel via `getCountFromServer`** | Não precisa manter contadores globais. Únicos contadores manuais: `turmas.vagasOcupadas` e `turmas.vagasReservadas`, alterados só dentro de transações. |
 | **Vaga reservada na convocação** (`vagasReservadas`) | Convocar reserva a vaga; matricular a converte em ocupada; desistir/prazo a devolve. Vaga livre = `vagas − ocupadas − reservadas`. Assim a seleção nunca convoca mais gente do que há vagas, mesmo com convocados ainda reunindo documentos. |
-| **Edital como unidade de configuração** | Modalidade, requisitos, prazos e lista de espera ficam no edital, não no código. Outra instituição = outro edital. |
+| **Edital como unidade de configuração** | Modalidade, requisitos, prazos e lista de remanescentes ficam no edital, não no código. Outra instituição = outro edital. |
 | **Sorteio auditável** | O sorteio usa uma **semente** (digitada, p. ex. da Loteria Federal, ou gerada) e é gravado em `selecoes/` com a lista de candidatos. Qualquer pessoa refaz o sorteio e confere — o sistema mostra "Conferido" no registro. |
 | **Seleção só uma vez por turma** | O id `editalId_turmaId` do registro impede repetir o sorteio até obter outro resultado. |
 | **Papéis em `users/{uid}`**, não em custom claims | Funciona só com o plano gratuito, sem Cloud Functions. Troca de papel vale na hora. |
@@ -178,7 +180,7 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
     { "id": "documentos-pessoais", "tipo": "documento", "rotulo": "Documentos pessoais" },
     { "id": "taxa-de-matricula", "tipo": "pagamento", "rotulo": "Taxa de matrícula" }
   ],
-  "config": { "listaEspera": true, "prazoMatriculaDias": 5, "notaMinima": 0, "notaMaxima": 10 }
+  "config": { "listaRemanescentes": true, "prazoMatriculaDias": 5, "notaMinima": 0, "notaMaxima": 10 }
 }
 ```
 `turmaIds` (usado pelas regras de segurança) e `turmas` (cópia com nomes, para o formulário do site montar as opções) andam juntos. `notaMinima`/`notaMaxima` só valem para a modalidade `prova`. O site pode listar os editais abertos com `listarEditaisAbertos()`: as regras só deixam ler os que estão em `inscricoes`.
@@ -211,8 +213,8 @@ Os campos acima são os únicos aceitos na criação pública. O sistema acresce
     "taxa-de-matricula":   { "rotulo": "Taxa de matrícula",    "tipo": "pagamento", "cumprido": false }
   } }
 
-// suplente
-{ "status": "suplente", "posicaoSuplencia": 2 }
+// remanescente
+{ "status": "remanescente", "posicaoRemanescente": 2 }
 
 // matriculada
 { "status": "matriculada", "alunoId": "a1b2", "matriculaId": "t9x8_a1b2", "matriculadaEm": "<Timestamp>", "matriculadaPor": "<uid>" }
@@ -231,11 +233,11 @@ Os requisitos são copiados do edital para a inscrição (com o rótulo), para a
   "semente": "lotfed-12345-67890",
   "algoritmo": "ids em ordem alfabética → embaralhados por Fisher-Yates com números de mulberry32 semeado por xmur3(semente)",
   "vagasLivres": 17,
-  "listaEspera": true,
+  "listaRemanescentes": true,
   "notaMinima": null,
   "candidatos": ["i001", "i002", "i003"],
   "convocados": ["i003", "i001"],
-  "suplentes": ["i002"],
+  "remanescentes": ["i002"],
   "naoSelecionados": [],
   "executadaPor": "<uid>",
   "executadaEm": "<Timestamp>"
@@ -311,24 +313,24 @@ O sistema só **sinaliza**: marcar uma matrícula como `evadida` é decisão da 
 
 ## Fluxos críticos
 
-Todos os que mexem em vagas são **transações** (tudo ou nada) e seguem a mesma forma: o Firestore não permite consulta dentro de transação e exige todas as leituras antes de qualquer escrita; por isso o que precisa de consulta (candidatos, aluno por e-mail, próximo suplente) é buscado **antes**, e a transação **releia e confirme** cada documento. Os corpos das transações (`...NaTransacao`) são exportados para serem testados com uma `tx` falsa. Cada recusa de regra de negócio é um `ErroDeNegocio` com código próprio, cuja mensagem já serve para mostrar na tela.
+Todos os que mexem em vagas são **transações** (tudo ou nada) e seguem a mesma forma: o Firestore não permite consulta dentro de transação e exige todas as leituras antes de qualquer escrita; por isso o que precisa de consulta (candidatos, aluno por e-mail, próximo remanescente) é buscado **antes**, e a transação **releia e confirme** cada documento. Os corpos das transações (`...NaTransacao`) são exportados para serem testados com uma `tx` falsa. Cada recusa de regra de negócio é um `ErroDeNegocio` com código próprio, cuja mensagem já serve para mostrar na tela.
 
 **Executar a seleção** — ✅ `js/services/selecao.service.js` (`executarSelecao`), uma turma por vez:
 1. exige edital em `selecao`, modalidade automática, turma ofertada e que a seleção da turma ainda não tenha sido feita;
 2. entram só as inscrições que continuam `inscrita`; `ordenarCandidatos` define quem está apto e em que ordem (sorteio com semente, notas, ordem de inscrição);
-3. `distribuirVagas`: os primeiros N (N = vagas livres) viram `convocada` e **reservam vaga**; o resto vira `suplente` (com `posicaoSuplencia`) ou `nao_selecionada` (se o edital não tem lista de espera, ou por nota ausente/abaixo da mínima);
+3. `distribuirVagas`: os primeiros N (N = vagas livres) viram `convocada` e **reservam vaga**; o resto vira `remanescente` (com `posicaoRemanescente`) ou `nao_selecionada` (se o edital não tem lista de remanescentes, ou por nota ausente/abaixo da mínima);
 4. grava `selecoes/{editalId_turmaId}` e soma `turmas.vagasReservadas`. Limite de uma transação: 490 inscrições por turma.
 
-**Convocar individualmente** — ✅ `convocarInscricao` (modalidade `analise`) e `convocarProximoSuplente`: confirma que a inscrição é `inscrita`/`suplente`, que a turma aceita matrícula e que há vaga livre; reserva a vaga.
+**Convocar individualmente** — ✅ `convocarInscricao` (modalidade `analise`) e `convocarProximoRemanescente`: confirma que a inscrição é `inscrita`/`remanescente`, que a turma aceita matrícula e que há vaga livre; reserva a vaga.
 
 **Efetivar matrícula** — ✅ `efetivarMatricula`, a partir de uma `convocada`:
 1. *fora* da transação, procura aluno com o mesmo e-mail (`buscarAlunoPorEmail`); se não achar, reserva um id novo;
 2. validações: inscrição `convocada` · **todos os requisitos cumpridos** · turma aceita matrícula · há vaga reservada · matrícula ainda não existe;
 3. escritas: cria o aluno (ou reativa o existente se estava inativo/evadido) · cria `matriculas/{turmaId_alunoId}` · `vagasReservadas −1` e `vagasOcupadas +1` · inscrição → `matriculada`.
 
-**Desistência / prazo vencido** — ✅ `desistirDaVaga`: `convocada` → `desistente` e `vagasReservadas −1`. A vaga volta e fica disponível para o próximo suplente. A tela marca "Prazo vencido" mas **não encerra a convocação sozinha**: a equipe decide (não há processo agendado rodando).
+**Desistência / prazo vencido** — ✅ `desistirDaVaga`: `convocada` → `desistente` e `vagasReservadas −1`. A vaga volta e fica disponível para o próximo remanescente. A tela marca "Prazo vencido" mas **não encerra a convocação sozinha**: a equipe decide (não há processo agendado rodando).
 
-**Indeferir** — ✅ `indeferirInscricao`: recusa de `inscrita`/`suplente`; não mexe em vagas.
+**Indeferir** — ✅ `indeferirInscricao`: recusa de `inscrita`/`remanescente`; não mexe em vagas.
 
 **Avançar etapa do edital** — ✅ `avancarEtapa`: não abre inscrições com a janela já vencida e não publica o resultado enquanto alguma turma não tiver a seleção executada (nas modalidades automáticas).
 
@@ -339,10 +341,10 @@ Todos os que mexem em vagas são **transações** (tudo ou nada) e seguem a mesm
 
 **Lançar notas:** gravar `avaliacoes/{id}.notas` e recalcular `matriculas.media` com `calcularMedia`.
 
-**Cancelar/trancar matrícula** (a implementar): mudar `status` e `turmas.vagasOcupadas -= 1` na mesma transação; a vaga fica livre para o próximo suplente.
+**Cancelar/trancar matrícula** (a implementar): mudar `status` e `turmas.vagasOcupadas -= 1` na mesma transação; a vaga fica livre para o próximo remanescente.
 
 ## Índices
 
 Consultas com filtro de igualdade + `orderBy` em outro campo exigem índice composto. Os usados nos serviços atuais estão em [`firestore.indexes.json`](../firestore.indexes.json). Se uma consulta nova falhar, o console do navegador mostra um link que cria o índice com um clique.
 
-Enquanto os volumes são pequenos (uma incubadora), os serviços preferem **filtrar por igualdade no servidor e ordenar/filtrar o resto no cliente** — é o caso de `listarInscricoesDoEdital`, `listarSuplentes` e `listarTurmasMatriculaveis`, que por isso não precisam de índice (só filtros de igualdade).
+Enquanto os volumes são pequenos (uma incubadora), os serviços preferem **filtrar por igualdade no servidor e ordenar/filtrar o resto no cliente** — é o caso de `listarInscricoesDoEdital`, `listarRemanescentes` e `listarTurmasMatriculaveis`, que por isso não precisam de índice (só filtros de igualdade).

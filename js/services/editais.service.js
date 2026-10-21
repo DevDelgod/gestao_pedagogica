@@ -36,7 +36,7 @@ export const listarEditaisAbertos = () =>
  * @param {{ titulo: string, descricao?: string, modalidade: string, inscricoesInicio: Date, inscricoesFim: Date,
  *   dataResultado?: string|null, turmas: Array<{ id: string, nome: string, cursoId: string, cursoNome: string }>,
  *   requisitosMatricula?: Array<{ id: string, tipo: string, rotulo: string }>,
- *   config?: { listaEspera?: boolean, prazoMatriculaDias?: number, notaMinima?: number, notaMaxima?: number } }} dados
+ *   config?: { listaRemanescentes?: boolean, prazoMatriculaDias?: number, notaMinima?: number, notaMaxima?: number } }} dados
  */
 function prepararDados(dados) {
   if (!dados.titulo?.trim()) throw new ErroDeNegocio('dados-invalidos', 'Informe o título do edital.');
