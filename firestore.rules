@@ -91,7 +91,8 @@ service cloud.firestore {
     match /inscricoes/{id} {
       allow create: if request.resource.data.keys().hasAll(['nome', 'email', 'editalId', 'turmaId', 'status', 'criadoEm'])
         && request.resource.data.keys().hasOnly(
-             ['nome', 'email', 'telefone', 'editalId', 'turmaId', 'mensagem', 'origem', 'status', 'criadoEm'])
+             ['nome', 'nomeSocial', 'genero', 'generoOutro', 'email', 'telefone', 'editalId', 'turmaId',
+              'mensagem', 'origem', 'status', 'criadoEm'])
         && request.resource.data.status == 'inscrita'
         && request.resource.data.criadoEm == request.time
         && request.resource.data.nome is string
@@ -101,6 +102,14 @@ service cloud.firestore {
         && request.resource.data.editalId is string
         && request.resource.data.turmaId is string
         && (!('mensagem' in request.resource.data) || request.resource.data.mensagem.size() <= 1000)
+        // nome social e gênero são opcionais; o gênero "outro" vem com texto livre (mesma lista de js/models/schema.js)
+        && (!('nomeSocial' in request.resource.data)
+            || (request.resource.data.nomeSocial is string && request.resource.data.nomeSocial.size() <= 120))
+        && (!('genero' in request.resource.data)
+            || request.resource.data.genero in ['mulher_cis', 'homem_cis', 'mulher_trans', 'homem_trans', 'travesti',
+                                                'nao_binario', 'genero_fluido', 'agenero', 'outro', 'nao_informar'])
+        && (!('generoOutro' in request.resource.data)
+            || (request.resource.data.generoOutro is string && request.resource.data.generoOutro.size() <= 60))
         && editalAceitaInscricao(request.resource.data.editalId, request.resource.data.turmaId);
       allow read, update, delete: if ehGestao();
     }

@@ -133,6 +133,23 @@ export const TIPO_AVALIACAO = Object.freeze({
 /** Ordem de Date#getDay(): domingo = 0. */
 export const DIAS_SEMANA = Object.freeze(['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab']);
 
+/**
+ * Gênero autodeclarado (opcional). Com 'outro' a pessoa escreve o próprio (campo generoOutro).
+ * ATENÇÃO: esta lista é repetida em firestore.rules (criação pública de inscrição); mude nos dois lugares.
+ */
+export const GENEROS = Object.freeze([
+  'mulher_cis',
+  'homem_cis',
+  'mulher_trans',
+  'homem_trans',
+  'travesti',
+  'nao_binario',
+  'genero_fluido',
+  'agenero',
+  'outro',
+  'nao_informar',
+]);
+
 // ---------------------------------------------------------------------------
 // IDs determinísticos — impedem duplicidade sem precisar de query antes de gravar
 // ---------------------------------------------------------------------------
@@ -187,7 +204,10 @@ export const novaTurma = (d) => ({
 
 /** alunos/{alunoId} */
 export const novoAluno = (d) => ({
-  nome: d.nome,
+  nome: d.nome, // nome civil (o do documento)
+  nomeSocial: d.nomeSocial ?? '', // se houver, é o nome usado para chamar a pessoa (ver domain/pessoa.js)
+  genero: d.genero ?? null, // um de GENEROS, ou null
+  generoOutro: d.generoOutro ?? '', // texto livre, só quando genero === 'outro'
   email: (d.email ?? '').trim().toLowerCase(), // sempre minúsculo: é a chave para achar duplicados
   telefone: d.telefone ?? '',
   cpf: d.cpf ?? '',
@@ -238,6 +258,10 @@ export const novaInscricao = (d) => ({
   mensagem: d.mensagem ?? '',
   origem: d.origem ?? 'site',
   status: STATUS_INSCRICAO.INSCRITA,
+  // opcionais: só entram no documento quando preenchidos (as regras aceitam a ausência, não valores vazios)
+  ...(d.nomeSocial ? { nomeSocial: d.nomeSocial } : {}),
+  ...(d.genero ? { genero: d.genero } : {}),
+  ...(d.generoOutro ? { generoOutro: d.generoOutro } : {}),
 });
 
 /** Estado inicial do resumo de frequência dentro de matriculas/{id}. */

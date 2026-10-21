@@ -5,7 +5,30 @@
  * Apagar arquivo exige assinatura (api_secret) e por isso NÃO dá para fazer daqui;
  * se um dia for preciso, será por uma Cloud Function. Guardar o publicId já deixa isso pronto.
  */
-import { cloudinary } from './config.js';
+import { cloudinary, modoDesenvolvimento } from './config.js';
+
+/** Modo desenvolvimento: sem conta no Cloudinary. O arquivo vira um data URL guardado no navegador. */
+const LIMITE_SIMULADO = 600 * 1024;
+
+async function simularEnvio(arquivo, pasta) {
+  if (arquivo.size > LIMITE_SIMULADO) {
+    throw new Error('No modo desenvolvimento o limite é de 600 KB por arquivo (os dados ficam guardados no navegador).');
+  }
+  const url = await new Promise((resolver, rejeitar) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolver(leitor.result);
+    leitor.onerror = () => rejeitar(new Error('Não foi possível ler o arquivo.'));
+    leitor.readAsDataURL(arquivo);
+  });
+  return {
+    nome: arquivo.name,
+    url,
+    publicId: `fudev/${pasta}/${crypto.randomUUID().slice(0, 8)}`,
+    tipo: arquivo.type.startsWith('image/') ? 'image' : 'raw',
+    formato: (arquivo.name.split('.').pop() ?? '').toLowerCase(),
+    bytes: arquivo.size,
+  };
+}
 
 /**
  * @param {File} arquivo
@@ -13,6 +36,8 @@ import { cloudinary } from './config.js';
  * @returns {Promise<{ nome: string, url: string, publicId: string, tipo: string, formato: string, bytes: number }>}
  */
 export async function enviarArquivo(arquivo, pasta = 'geral') {
+  if (modoDesenvolvimento) return simularEnvio(arquivo, pasta);
+
   const corpo = new FormData();
   corpo.append('file', arquivo);
   corpo.append('upload_preset', cloudinary.uploadPreset);

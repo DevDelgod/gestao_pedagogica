@@ -35,6 +35,7 @@ import {
   novoAluno,
 } from '../models/schema.js';
 import { ROTULO_STATUS_INSCRICAO } from '../models/rotulos.js';
+import { nomeExibicao } from '../domain/pessoa.js';
 import { buscarAlunoPorEmail } from './alunos.service.js';
 import { aceitaMatricula, vagasLivres } from './turmas.service.js';
 
@@ -221,14 +222,21 @@ export async function efetivarNaTransacao(tx, { inscricaoId, alunoId, alunoJaExi
     throw new ErroDeNegocio('conflito', 'O cadastro do aluno mudou durante a operação. Tente novamente.');
   }
   const alunoExistente = alunoJaExiste ? alunoSnap.data() : null;
-  const alunoNome = alunoExistente?.nome ?? inscricao.nome;
+  const alunoNome = nomeExibicao(alunoExistente ?? inscricao); // nome social, se houver
   if (matriculaSnap.exists()) {
     throw new ErroDeNegocio('ja-matriculado', `${alunoNome} já tem matrícula nesta turma (${matriculaSnap.data().status}).`);
   }
 
   // --- escritas ---
   if (!alunoJaExiste) {
-    const aluno = novoAluno({ nome: inscricao.nome, email: inscricao.email, telefone: inscricao.telefone });
+    const aluno = novoAluno({
+      nome: inscricao.nome,
+      nomeSocial: inscricao.nomeSocial,
+      genero: inscricao.genero,
+      generoOutro: inscricao.generoOutro,
+      email: inscricao.email,
+      telefone: inscricao.telefone,
+    });
     tx.set(alunoRef, { ...aluno, ...auditoriaDeCriacao() });
   } else if (alunoExistente.status !== STATUS_ALUNO.ATIVO) {
     tx.update(alunoRef, { status: STATUS_ALUNO.ATIVO, atualizadoEm: serverTimestamp() }); // quem volta, volta ativo

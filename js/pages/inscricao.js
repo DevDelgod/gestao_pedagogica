@@ -6,7 +6,9 @@
  */
 import { $, escapar } from '../core/ui.js';
 import { formatarData, formatarDataHora } from '../core/datas.js';
-import { ROTULO_MODALIDADE } from '../models/rotulos.js';
+import { validarGenero, validarNomeSocial } from '../domain/pessoa.js';
+import { GENEROS } from '../models/schema.js';
+import { ROTULO_GENERO, ROTULO_MODALIDADE } from '../models/rotulos.js';
 import { listarEditaisAbertos } from '../services/editais.service.js';
 import { enviarInscricaoPublica } from '../services/inscricoes.service.js';
 
@@ -85,6 +87,17 @@ function mostrarEdital() {
 
 selEdital.addEventListener('change', mostrarEdital);
 
+// Gênero: lista de opções + campo de texto livre que só aparece em "Outro"
+$('#in-genero').innerHTML =
+  '<option value="">Selecione (opcional)</option>' + GENEROS.map((g) => `<option value="${g}">${ROTULO_GENERO[g]}</option>`).join('');
+
+function sincronizarGenero() {
+  const outro = $('#in-genero').value === 'outro';
+  $('#campo-genero-outro').hidden = !outro;
+  if (outro) $('#in-genero-outro').focus();
+}
+$('#in-genero').addEventListener('change', sincronizarGenero);
+
 // ---------------------------------------------------------------------------
 // Envio
 // ---------------------------------------------------------------------------
@@ -100,6 +113,11 @@ form.addEventListener('submit', async (evento) => {
   if (nome.length < 2) return mostrarErro('Informe seu nome completo.', $('#in-nome'));
   if (!EMAIL.test(email) || email.length < 5) return mostrarErro('Informe um e-mail válido.', $('#in-email'));
 
+  const social = validarNomeSocial($('#in-nome-social').value);
+  if (social.erro) return mostrarErro(social.erro, $('#in-nome-social'));
+  const genero = validarGenero({ genero: $('#in-genero').value, generoOutro: $('#in-genero-outro').value });
+  if (genero.erro) return mostrarErro(genero.erro, $('#in-genero').value === 'outro' ? $('#in-genero-outro') : $('#in-genero'));
+
   const botao = $('#btn-enviar');
   botao.disabled = true;
   botao.textContent = 'Enviando…';
@@ -112,12 +130,15 @@ form.addEventListener('submit', async (evento) => {
         editalId: edital.id,
         turmaId: selTurma.value,
         nome,
+        nomeSocial: social.dados,
+        genero: genero.dados.genero,
+        generoOutro: genero.dados.generoOutro,
         email,
         telefone: $('#in-telefone').value.trim(),
         mensagem: $('#in-mensagem').value.trim(),
       });
     }
-    mostrarSucesso(edital, email);
+    mostrarSucesso(edital, email, $('#in-telefone').value.trim());
   } catch (erro) {
     console.error(erro);
     mostrarErro(
@@ -130,19 +151,20 @@ form.addEventListener('submit', async (evento) => {
   }
 });
 
-function mostrarSucesso(edital, email) {
+function mostrarSucesso(edital, email, telefone) {
   form.hidden = true;
   $('#sub').textContent = 'Inscrição recebida!';
   $('#sucesso').innerHTML = `
     <p>Recebemos a sua inscrição em <strong>${escapar(edital.titulo)}</strong>.</p>
-    <p class="item__meta">As próximas informações serão enviadas para <strong>${escapar(email)}</strong>.${
-      edital.dataResultado ? ` O resultado será divulgado em ${formatarData(edital.dataResultado)}.` : ''
-    }</p>
+    <p class="item__meta">A coordenação entrará em contato pelo e-mail <strong>${escapar(email)}</strong>${
+      telefone ? ' ou pelo telefone informado' : ''
+    }.${edital.dataResultado ? ` O resultado será divulgado em ${formatarData(edital.dataResultado)}.` : ''}</p>
     <button class="botao botao--fantasma botao--bloco" type="button" id="btn-outra">Fazer outra inscrição</button>`;
   $('#sucesso').hidden = false;
   $('#btn-outra').addEventListener('click', () => {
     $('#sucesso').hidden = true;
     form.reset();
+    $('#campo-genero-outro').hidden = true; // reset() limpa o campo, mas não o esconde
     $('#btn-enviar').disabled = false;
     $('#btn-enviar').textContent = 'Enviar inscrição';
     form.hidden = false;

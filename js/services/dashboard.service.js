@@ -19,7 +19,11 @@ const contar = async (colecao, ...filtros) => {
   return snap.data().count;
 };
 
-export async function carregarResumo() {
+/**
+ * @param {{ incluirInscricoes?: boolean }} [opcoes] o professor não pode ler inscrições (firestore.rules):
+ *   para ele, os dois números que dependem delas voltam 0 em vez de gerar erro de permissão.
+ */
+export async function carregarResumo({ incluirInscricoes = true } = {}) {
   const [
     alunosAtivos,
     turmasEmAndamento,
@@ -33,8 +37,8 @@ export async function carregarResumo() {
     contar(COLECOES.ALUNOS, where('status', '==', STATUS_ALUNO.ATIVO)),
     contar(COLECOES.TURMAS, where('status', '==', STATUS_TURMA.EM_ANDAMENTO)),
     contar(COLECOES.MATRICULAS, where('status', '==', STATUS_MATRICULA.ATIVA)),
-    contar(COLECOES.INSCRICOES, where('status', '==', STATUS_INSCRICAO.INSCRITA)),
-    contar(COLECOES.INSCRICOES, where('status', '==', STATUS_INSCRICAO.CONVOCADA)),
+    incluirInscricoes ? contar(COLECOES.INSCRICOES, where('status', '==', STATUS_INSCRICAO.INSCRITA)) : 0,
+    incluirInscricoes ? contar(COLECOES.INSCRICOES, where('status', '==', STATUS_INSCRICAO.CONVOCADA)) : 0,
     contar(
       COLECOES.MATRICULAS,
       where('status', '==', STATUS_MATRICULA.ATIVA),

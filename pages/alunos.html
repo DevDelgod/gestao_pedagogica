@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Alunos · FUDEV</title>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <noscript><style>body[data-auth] { visibility: visible; }</style></noscript>
+  </head>
+  <body data-auth="pending">
+    <div class="app">
+      <aside class="sidebar" id="sidebar"></aside>
+
+      <main class="principal">
+        <header class="topo topo--acao">
+          <div>
+            <h1>Alunos</h1>
+            <p class="topo__sub">Cadastro, matrículas e documentos de cada aluno.</p>
+          </div>
+          <button class="botao" type="button" id="btn-novo">Novo aluno</button>
+        </header>
+
+        <div class="barra">
+          <div class="campo">
+            <label for="f-busca">Buscar</label>
+            <input id="f-busca" type="search" placeholder="Nome, e-mail ou CPF" autocomplete="off" />
+          </div>
+          <div class="campo">
+            <label for="f-status">Situação</label>
+            <select id="f-status"></select>
+          </div>
+          <div class="campo">
+            <label for="f-turma">Turma</label>
+            <select id="f-turma"></select>
+          </div>
+        </div>
+
+        <p class="item__meta" id="contagem" aria-live="polite"></p>
+        <section class="lista" id="lista" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <!-- Ficha do aluno: cadastro + matrículas + documentos -->
+    <dialog class="dialogo dialogo--largo" id="dlg-ficha" aria-labelledby="ficha-titulo">
+      <h2 id="ficha-titulo">Novo aluno</h2>
+      <p class="dialogo__sub" id="ficha-sub"></p>
+
+      <form id="form-aluno" novalidate>
+        <p class="aviso" id="aluno-erro" role="alert" hidden></p>
+
+        <div class="grade-2">
+          <div class="campo">
+            <label for="al-nome">Nome completo (como no documento)</label>
+            <input id="al-nome" maxlength="120" autocomplete="off" />
+          </div>
+          <div class="campo">
+            <label for="al-nome-social">Nome social</label>
+            <input id="al-nome-social" maxlength="120" autocomplete="off" aria-describedby="ajuda-al-social" />
+            <small class="campo__ajuda" id="ajuda-al-social">Se houver, é o nome usado para chamar a pessoa no sistema.</small>
+          </div>
+          <div class="campo">
+            <label for="al-email">E-mail</label>
+            <input id="al-email" type="email" maxlength="120" autocomplete="off" />
+          </div>
+          <div class="campo">
+            <label for="al-telefone">Telefone</label>
+            <input id="al-telefone" type="tel" maxlength="30" autocomplete="off" />
+          </div>
+          <div class="campo">
+            <label for="al-cpf">CPF</label>
+            <input id="al-cpf" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="000.000.000-00" />
+          </div>
+          <div class="campo">
+            <label for="al-nascimento">Data de nascimento</label>
+            <input id="al-nascimento" type="date" />
+          </div>
+          <div class="campo">
+            <label for="al-genero">Gênero</label>
+            <select id="al-genero"></select>
+          </div>
+          <div class="campo" id="campo-al-genero-outro" hidden>
+            <label for="al-genero-outro">Como a pessoa se identifica?</label>
+            <input id="al-genero-outro" maxlength="60" autocomplete="off" />
+          </div>
+        </div>
+
+        <fieldset class="campo">
+          <legend>Responsável</legend>
+          <p class="campo__ajuda" id="al-aviso-menor" hidden>O aluno é menor de 18 anos: o nome do responsável é obrigatório.</p>
+          <div class="grade-2">
+            <div class="campo">
+              <label for="al-resp-nome">Nome</label>
+              <input id="al-resp-nome" maxlength="120" autocomplete="off" />
+            </div>
+            <div class="campo">
+              <label for="al-resp-telefone">Telefone</label>
+              <input id="al-resp-telefone" type="tel" maxlength="30" autocomplete="off" />
+            </div>
+            <div class="campo">
+              <label for="al-resp-parentesco">Parentesco</label>
+              <input id="al-resp-parentesco" maxlength="40" placeholder="Ex.: mãe" autocomplete="off" />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="campo">
+          <legend>Endereço</legend>
+          <div class="grade-2">
+            <div class="campo">
+              <label for="al-cidade">Cidade</label>
+              <input id="al-cidade" maxlength="80" autocomplete="off" />
+            </div>
+            <div class="campo">
+              <label for="al-bairro">Bairro</label>
+              <input id="al-bairro" maxlength="80" autocomplete="off" />
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="campo">
+          <label for="al-observacoes">Observações</label>
+          <textarea id="al-observacoes" maxlength="1000"></textarea>
+        </div>
+
+        <button class="botao" type="submit" id="aluno-salvar">Salvar cadastro</button>
+      </form>
+
+      <section class="secao-ficha" id="ficha-matriculas" hidden>
+        <h3>Matrículas</h3>
+        <div class="sublista" id="lista-matriculas"></div>
+        <div class="linha-add" id="linha-matricular">
+          <select id="mat-turma" aria-label="Turma para matricular"></select>
+          <button class="botao botao--fantasma" type="button" id="mat-adicionar">Matricular nesta turma</button>
+        </div>
+        <small class="campo__ajuda">Matrícula direta, sem edital: só aparecem turmas que aceitam matrícula, com vaga livre e onde o aluno ainda não está.</small>
+      </section>
+
+      <section class="secao-ficha" id="ficha-documentos" hidden>
+        <h3>Documentos</h3>
+        <ul class="sublista" id="lista-docs"></ul>
+        <p class="aviso" id="doc-erro" role="alert" hidden></p>
+        <div class="linha-add">
+          <input id="doc-arquivo" type="file" accept=".pdf,image/*" aria-label="Arquivo do documento" />
+          <button class="botao botao--fantasma" type="button" id="doc-enviar">Enviar documento</button>
+        </div>
+      </section>
+
+      <div class="dialogo__acoes">
+        <button class="botao botao--fantasma" type="button" data-fechar>Fechar</button>
+      </div>
+    </dialog>
+
+    <!-- Mudança de situação da matrícula (com motivo opcional) -->
+    <dialog class="dialogo" id="dlg-situacao" aria-labelledby="situacao-titulo">
+      <form id="form-situacao" novalidate>
+        <h2 id="situacao-titulo"></h2>
+        <p class="dialogo__sub" id="situacao-resumo"></p>
+        <p class="aviso" id="situacao-erro" role="alert" hidden></p>
+        <div class="campo">
+          <label for="situacao-motivo">Motivo (opcional)</label>
+          <textarea id="situacao-motivo" maxlength="300"></textarea>
+        </div>
+        <div class="dialogo__acoes">
+          <button class="botao botao--fantasma" type="button" data-fechar>Voltar</button>
+          <button class="botao botao--perigo" type="submit" id="situacao-confirmar"></button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="../js/pages/alunos.js"></script>
+  </body>
+</html>

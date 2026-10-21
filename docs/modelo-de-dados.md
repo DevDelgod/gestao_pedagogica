@@ -80,7 +80,8 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
 
 ### Limites conhecidos (para evoluir depois)
 
-- **Portal do aluno:** como a chamada e as notas ficam num mapa por documento, um aluno logado conseguiria ver a turma inteira. Quando criar o portal, ou grave um espelho individual por aluno (`matriculas.{id}` já tem o resumo), ou migre `registros`/`notas` para documentos individuais (`aulas/{id}/presencas/{alunoId}`). Hoje só a equipe acessa, então não é problema.
+- **Sem portal do aluno (decisão):** o sistema é só para **coordenadores e professores**; o aluno é apenas um registro, nunca um usuário. Por isso a chamada e as notas ficam num mapa por documento (rápido de gravar e de ler) sem preocupação com privacidade entre alunos. Se um dia houver portal, será preciso um espelho individual por aluno ou documentos separados por aluno (`aulas/{id}/presencas/{alunoId}`).
+- **Dados sensíveis:** gênero, nome social e CPF são dados pessoais que pedem cuidado (LGPD). O gênero é opcional e só a equipe lê; ao implantar, defina e informe a finalidade da coleta no formulário.
 - **Spam no formulário público** (`inscricao.html`): a página tem um campo-armadilha contra robôs simples, e as regras limitam campos, tamanhos e janela de datas, mas nada impede volume nem a mesma pessoa se inscrever várias vezes. Ative o **Firebase App Check** (reCAPTCHA) antes de publicar o formulário. Inscrições duplicadas (mesmo e-mail no mesmo edital) ainda não são detectadas: no sorteio, cada inscrição concorre; trate duplicatas com *Indeferir* antes de encerrar as inscrições.
 - **Várias instituições no mesmo projeto:** o modelo atual atende **uma instituição por projeto do Firebase**, com o processo configurado por edital. Cada instituição nova pode ter o seu próprio projeto (isolamento total e sem mudanças no código). Hospedar várias no mesmo projeto exigiria um `instituicaoId` em todos os documentos e nas regras — não está feito.
 - **Resultado público:** o site ainda não consegue exibir o resultado do sorteio (as inscrições e os registros só são lidos pela equipe). Quando for preciso, publique uma lista de protocolos/ids por edital numa coleção de leitura pública.
@@ -145,8 +146,11 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
 ### `alunos/{alunoId}`
 ```json
 {
-  "nome": "João Pereira",
-  "email": "joao@email.com",
+  "nome": "Beatriz Lopes",
+  "nomeSocial": "Bia Lopes",
+  "genero": "outro",
+  "generoOutro": "Demigênero",
+  "email": "bia@email.com",
   "telefone": "(11) 91234-5678",
   "cpf": "",
   "dataNascimento": "2008-05-14",
@@ -166,6 +170,12 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
 }
 ```
 `email` é sempre gravado em minúsculas (usado para achar duplicados). `status`: `ativo` | `inativo` | `evadido`.
+
+**Nome social e gênero** (o sistema atende pessoas LGBTQIAPN+): `nome` é o nome civil (o do documento) e `nomeSocial`, quando existe, é o **nome usado para chamar a pessoa**: listas, chamada, avisos e a cópia `alunoNome` nas matrículas usam o social (`nomeExibicao` em `js/domain/pessoa.js`), e o civil aparece como informação secundária para a equipe. Mudar o nome social atualiza a cópia nas matrículas do aluno na mesma operação. `genero` é **opcional** e autodeclarado, um de `GENEROS` (`js/models/schema.js`): mulher cis, homem cis, mulher trans, homem trans, travesti, pessoa não binária, gênero fluido, agênero, **outro**, prefiro não informar. Com `outro`, a pessoa escreve o próprio gênero em `generoOutro` (até 60 caracteres); com qualquer outra opção o texto livre é descartado. A lista de valores está repetida em `firestore.rules`: mude nos dois lugares.
+
+**A situação do aluno é derivada das matrículas, nunca editada à mão:** alguma matrícula `ativa` ou `trancada` → `ativo`; senão, alguma `evadida` → `evadido`; senão (só concluídas/canceladas, ou nenhuma) → `inativo`. Um aluno cadastrado à mão nasce `inativo` (sem matrícula) e vira `ativo` ao ser matriculado. **E-mail e CPF não podem repetir** entre alunos (o e-mail é a chave que liga uma inscrição a um cadastro existente); o CPF é gravado só com dígitos e conferido pelos dígitos verificadores. **Menor de 18 anos exige o nome do responsável.**
+
+`documentos` guarda `{ nome, url, publicId, tipo, bytes }` (até 10 por aluno). Remover um documento só o **desvincula**: apagar o arquivo no Cloudinary exige a chave secreta, ou seja, um servidor. No modo desenvolvimento o envio é simulado: o arquivo vira um data URL guardado no navegador, com limite de 600 KB.
 
 ### `editais/{editalId}`
 ```json
@@ -195,6 +205,8 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
 ```json
 {
   "nome": "João Pereira",
+  "nomeSocial": "Joana Pereira",
+  "genero": "mulher_trans",
   "email": "joao@email.com",
   "telefone": "(11) 91234-5678",
   "editalId": "ed01",
@@ -205,6 +217,7 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
   "criadoEm": "<Timestamp>"
 }
 ```
+`nomeSocial`, `genero` e `generoOutro` são opcionais e **só existem no documento quando preenchidos** (as regras aceitam a ausência, não valores vazios). Ao efetivar a matrícula, os três são copiados para o cadastro do aluno.
 Os campos acima são os únicos aceitos na criação pública. O sistema acrescenta o resto a cada etapa:
 
 ```json
@@ -275,7 +288,17 @@ Guarda ids, não nomes (o registro pode ser divulgado sem expor dados pessoais).
   "media": 7.4
 }
 ```
-`status`: `ativa` | `trancada` | `evadida` | `concluida` | `cancelada`.
+`status`: `ativa` | `trancada` | `evadida` | `concluida` | `cancelada`. Ao mudar de situação a matrícula ganha `motivoSituacao`, `situacaoEm` e `situacaoPor`.
+
+**Ciclo da matrícula** (`js/domain/matricula.js`; só a matrícula **ativa** ocupa vaga):
+
+| De | Para | Efeito em `turmas.vagasOcupadas` |
+|---|---|---|
+| ativa | trancada, evadida, cancelada, concluida | −1 |
+| trancada | ativa | +1 (exige turma que aceite matrícula e vaga livre) |
+| trancada | evadida, cancelada | 0 |
+| evadida, cancelada | ativa | +1 (idem) |
+| concluida | — | final |
 
 ### `aulas/{turmaId_AAAA-MM-DD}` — diário + chamada
 ```json
@@ -288,7 +311,7 @@ Guarda ids, não nomes (o registro pode ser divulgado sem expor dados pessoais).
   "resumo": { "presentes": 1, "faltas": 1, "justificadas": 1 }
 }
 ```
-Marcação: `P` presente · `F` falta · `J` falta justificada (conta como presença no percentual por padrão; configurável em `calcularFrequencia`).
+Marcação: `P` presente · `F` falta · `J` falta justificada (conta como presença no percentual por padrão; configurável em `calcularFrequencia`). Quem entra na chamada de uma data (`pessoasDaChamada`): as matrículas **ativas feitas até aquela data** e quem já consta na chamada gravada daquele dia, mesmo que hoje esteja trancado ou tenha saído.
 
 ### `avaliacoes/{avaliacaoId}`
 ```json
@@ -303,6 +326,8 @@ Marcação: `P` presente · `F` falta · `J` falta justificada (conta como prese
 }
 ```
 Quem não aparece em `notas` ainda não teve a nota lançada (não é zero). A média da matrícula é a média ponderada normalizada para 0–10.
+
+> **Decisão para o módulo de Avaliações (a construir):** a forma de avaliar **varia de instituição para instituição**, então será **configurável por curso**: **Apto / Não apto** (sem número) ou **nota numérica**. Cada avaliação registrará, conforme o modo do curso, `apto` (verdadeiro/falso) ou `nota`. O resultado final cruza a avaliação com a frequência mínima do curso: no modo Apto/Não apto, a pessoa precisa estar apta em todas as avaliações; no modo nota, a média precisa alcançar `mediaAprovacao`. O texto acima descreve o modo de nota; o modo Apto/Não apto ainda não está modelado.
 
 ---
 
@@ -342,14 +367,13 @@ Todos os que mexem em vagas são **transações** (tudo ou nada) e seguem a mesm
 
 **Avançar etapa do edital** — ✅ `avancarEtapa`: não abre inscrições com a janela já vencida e não publica o resultado enquanto alguma turma não tiver a seleção executada (nas modalidades automáticas).
 
-**Registrar chamada:**
-1. gravar `aulas/{turmaId_data}` com `registros` e `resumo`;
-2. ler as aulas da turma, montar a sequência de cada aluno em ordem de data;
-3. `calcularFrequencia` + `avaliarRiscoEvasao` → atualizar `frequencia` e `riscoEvasao` de cada matrícula (um `writeBatch`).
+**Registrar, corrigir e excluir uma aula** — ✅ `registrarAula` / `excluirAula` (`js/services/diario.service.js`, regras puras em `js/domain/diario.js`): uma única transação que (1) grava (ou corrige, ou apaga) `aulas/{turmaId_data}` com `registros` e `resumo` e (2) **recalcula do zero**, com todas as aulas de agora, a `frequencia` e o `riscoEvasao` de **todas** as matrículas da turma. Como nada é incrementado, corrigir ou excluir uma aula antiga acerta os números sozinho, e uma aula inserida no meio respeita a **ordem das datas** (importa para faltas consecutivas). A chamada exige uma marca para cada pessoa da lista; datas futuras são recusadas; turma cancelada não recebe chamada. O professor da turma pode registrar e corrigir; **excluir é só da coordenação** (regras do Firestore e botão da tela). Se outra pessoa criar uma aula entre a consulta e a gravação, ela não entra naquele cálculo, e a gravação seguinte corrige.
 
-**Lançar notas:** gravar `avaliacoes/{id}.notas` e recalcular `matriculas.media` com `calcularMedia`.
+**Lançar notas** (a construir): gravar `avaliacoes/{id}` e recalcular `matriculas.media` com `calcularMedia` (modo nota) ou o resultado apto/não apto (ver a decisão acima).
 
-**Cancelar/trancar matrícula** (a implementar): mudar `status` e `turmas.vagasOcupadas -= 1` na mesma transação; a vaga fica livre para o próximo remanescente.
+**Mudar a situação da matrícula** — ✅ `alterarSituacaoMatricula` (`js/services/matriculas.service.js`): numa transação, valida a transição, ajusta `vagasOcupadas` (nunca abaixo de zero), grava o motivo e recalcula a situação do aluno a partir de **todas** as matrículas dele (as outras são procuradas antes e relidas dentro da transação). A vaga liberada fica disponível para o próximo remanescente, que se convoca na tela de Inscrições.
+
+**Matrícula direta** — ✅ `matricularDireto`: matricula um aluno já cadastrado numa turma com vaga livre, sem edital. Recusa turma que não aceita matrícula ou lotada e quem já tem matrícula naquela turma (se for trancada, evadida ou cancelada, a mensagem manda reativá-la na ficha).
 
 ## Índices
 

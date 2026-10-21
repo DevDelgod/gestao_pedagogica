@@ -2,6 +2,10 @@
 
 O **FUDEV** é um sistema de gestão acadêmica para uma incubadora de cursos e projetos. Laboratório livre: começa pequeno e cresce módulo a módulo.
 
+> **Estado do projeto:** é um projeto de **portfólio**. O foco agora é o front-end e as funcionalidades completas, rodando no [modo desenvolvimento](#modo-desenvolvimento-testar-sem-firebase) (Firebase simulado no navegador, sem nenhuma conta externa). A conexão com Firebase e Cloudinary e o deploy ficam para quando o sistema for implantado de verdade.
+>
+> **Quem usa:** só **coordenadores e professores** (e admin). **Não há login de aluno nem portal do aluno**: o aluno é um registro, não um usuário. O professor tem experiência própria (painel e Diário de classe só com as turmas dele). O sistema atende pessoas LGBTQIAPN+: nome social como nome de exibição e gênero autodeclarado com a opção "Outro" de texto livre.
+
 **Stack:** HTML5 + CSS3 puro + JavaScript (ES Modules, sem build) · Firebase (Auth + Firestore) · Cloudinary (documentos e imagens).
 
 ## Estrutura de pastas
@@ -14,6 +18,8 @@ gestao_pedagogica/
 │   ├── dashboard.html          Painel do administrador
 │   ├── cursos.html             Catálogo de cursos (criar, editar, desativar)
 │   ├── turmas.html             Turmas: vagas, dias, horário, professor e situação
+│   ├── alunos.html             Alunos: ficha (cadastro, matrículas, documentos), busca e filtros
+│   ├── diario.html             Diário de classe: chamada rápida (P/F/J) e conteúdo da aula; usado pelo professor
 │   ├── editais.html            Processos seletivos: criar, configurar e avançar de etapa
 │   └── inscricoes.html         Inscrições de um edital: seleção, convocação e matrícula
 ├── css/
@@ -35,10 +41,15 @@ gestao_pedagogica/
 │   │   └── rotulos.js          Textos de tela para os valores do schema
 │   ├── domain/
 │   │   ├── regras.js           Frequência, risco de evasão, média (funções puras)
-│   │   ├── cadastros.js        Validação de curso e turma (valores de formulário → dados limpos)
+│   │   ├── cadastros.js        Validação de curso, turma e aluno (valores de formulário → dados limpos; CPF)
+│   │   ├── matricula.js        Ciclo da matrícula: transições permitidas, efeito nas vagas, situação do aluno
+│   │   ├── diario.js           Chamada: validação, quem entra na lista, recálculo da frequência e do risco
+│   │   ├── pessoa.js           Nome social como nome de exibição; gênero com "Outro" (texto livre)
 │   │   └── selecao.js          Sorteio auditável, classificação por nota, ordem de inscrição
 │   ├── services/               Acesso a dados por módulo (um arquivo por módulo)
-│   │   ├── alunos.service.js         ← molde dos demais
+│   │   ├── alunos.service.js         ← molde dos demais; cadastro, documentos
+│   │   ├── matriculas.service.js     ciclo da matrícula (trancar, evadir, cancelar…) e matrícula direta
+│   │   ├── diario.service.js         registrar/corrigir/excluir aula e recalcular a frequência (uma transação)
 │   │   ├── editais.service.js        criar/editar edital, avançar etapa
 │   │   ├── selecao.service.js        realizar a seleção do edital (sorteio/classificação, com registro auditável)
 │   │   ├── inscricoes.service.js     convocar, efetivar matrícula (transação), desistência, indeferir
@@ -54,6 +65,8 @@ gestao_pedagogica/
 │       ├── dashboard.js
 │       ├── cursos.js
 │       ├── turmas.js
+│       ├── alunos.js
+│       ├── diario.js
 │       ├── editais.js
 │       └── inscricoes.js
 ├── tools/
@@ -92,11 +105,14 @@ Enquanto `js/core/config.js` estiver com `COLE_AQUI` **e** a página estiver em 
 
 - **Contas:** a tela de login mostra um botão por conta de desenvolvimento (Admin, Coordenação e Professor, para testar os três níveis de acesso). Os e-mails e a senha estão em [`js/dev/seed.js`](js/dev/seed.js).
 - **Dados:** o cenário de exemplo (um edital em cada etapa, turmas, alunos, matrículas) fica salvo no `localStorage` do navegador e **persiste entre páginas e recargas**. O botão **Restaurar dados** na faixa laranja do rodapé volta ao cenário original. Mudou o `seed.js`? Aumente `SEED_VERSAO` para os dados salvos serem refeitos.
+- **Integrações simuladas:** o envio de documentos (que usaria o Cloudinary) também funciona no modo desenvolvimento: o arquivo fica guardado no navegador, com limite de 600 KB.
 - **Aviso permanente:** a faixa laranja "MODO DESENVOLVIMENTO" aparece em todas as telas, para não confundir com dados reais.
 - **Desliga sozinho** ao preencher o `firebaseConfig`, e nunca liga fora de `localhost`/`127.0.0.1`. A pasta `js/dev/` está no `ignore` do `firebase.json` e não vai para o hosting.
 - **Limites:** o simulado **não** confere as `firestore.rules` nem exige índices compostos, e não reproduz concorrência real. Antes de usar com gente de verdade, teste no Firebase (emulador ou um projeto de teste).
 
-## Configurar (uma vez)
+## Conectar de verdade (adiado: só ao implantar)
+
+Nada desta seção é necessário para desenvolver ou demonstrar o sistema. Ela existe para o dia em que ele for implantado. O roteiro completo, com o que precisa ser **validado** (a camada real nunca rodou fora do simulador) e o que ainda falta para um produto vendável, está em [`docs/implantacao.md`](docs/implantacao.md).
 
 1. **Firebase:** crie o projeto → ative **Authentication → E-mail/senha** → crie o **Firestore** (modo produção) → registre um **app da Web** e cole a configuração em `js/core/config.js`.
 2. **Regras:** cole `firestore.rules` em Firestore → Regras → Publicar (ou `firebase deploy --only firestore`).
@@ -120,10 +136,21 @@ Depois abra `http://localhost:5500`. Alternativas: a extensão **Live Server** d
 
 Para o login funcionar em `localhost`, o domínio já vem autorizado por padrão no Firebase Auth. Ao publicar, adicione seu domínio em Authentication → Configurações → Domínios autorizados.
 
-## Próximos passos sugeridos
+## Próximos passos
 
-1. **Conectar o Firebase de verdade** (passo a passo em *Configurar*) e testar as `firestore.rules` com os três papéis. O modo desenvolvimento não confere as regras: elas são o maior risco ainda não testado.
-2. **Ativar o Firebase App Check** (reCAPTCHA) antes de divulgar o link do formulário público: as regras limitam o que a página pode gravar, mas não o volume.
-3. **Alunos e matrículas**: ver quem está matriculado em cada turma (hoje só o painel mostra números).
-4. **Diário de classe**: chamada rápida (toque alterna P → F → J) e recálculo do resumo.
-5. **Avaliações**: grade turma × avaliação com lançamento em lote.
+Construir, tudo no modo desenvolvimento:
+
+1. **Avaliações e notas**, com a forma de avaliar **configurável por curso**: **Apto / Não apto** ou **nota numérica** (varia de instituição para instituição). Grade turma × avaliação com lançamento em lote, para o professor.
+2. **Resultado final e boletim**: situação final (aprovado ou não) cruzando a avaliação com a frequência mínima do curso, e o boletim por aluno. Hoje "Concluir" é manual e não diz se a pessoa passou.
+3. **Equipe**: telas para cadastrar professores e coordenadores e definir o papel de cada um (hoje a equipe só existe nos dados de exemplo).
+4. **Relatórios com exportação em CSV** (matriculados, frequência, notas, e-mails dos convocados).
+5. **Acabamento de portfólio**: testes que rodem no navegador, capturas de tela no README, dados de exemplo mais ricos.
+
+Já pronto: login e painel (com visão própria do professor), cursos, turmas, editais, inscrições (com sorteio auditável), formulário público (com nome social e gênero), alunos/matrículas e **diário de classe com frequência e risco de evasão reais**.
+
+Ao implantar (adiado por decisão):
+
+- Conectar o Firebase (seção acima) e **testar as `firestore.rules` com os três papéis**: elas nunca rodaram fora do simulador.
+- Ativar o **Firebase App Check** antes de divulgar o formulário público, tratar inscrições duplicadas e, se for preciso comprovar, registrar o consentimento (LGPD).
+- Enviar **e-mail de verdade** aos convocados (exige serviço de envio e funções no servidor do Firebase).
+- Para mostrar o sistema num link público de portfólio, o modo desenvolvimento hoje só liga em `localhost`; liberar numa hospedagem estática seria uma decisão à parte.

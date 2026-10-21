@@ -7,7 +7,7 @@
  */
 
 /** Mude a versão sempre que alterar a semente: os dados de exemplo salvos no navegador são refeitos. */
-export const SEED_VERSAO = 2;
+export const SEED_VERSAO = 5;
 
 export const CONTAS_DEV = [
   {
@@ -68,35 +68,77 @@ export function semear(store, Timestamp) {
     });
   };
   turma('t1', 'Web 2026.1 — Noite', 'c1', 5, 1); // 4 vagas livres
-  turma('t2', 'Design 2026.1 — Tarde', 'c2', 2);
-  turma('t3', 'Robótica 2026.1', 'c3', 3);
-  turma('t4', 'Fotografia 2026.1', 'c4', 2);
-  turma('t7', 'Python 2026.1 — Manhã', 'c5', 3);
-  turma('t6', 'Web 2025.2 — Noite', 'c1', 10, 3, 'em_andamento', { dataInicio: '2025-08-04', dataFim: '2025-12-10' });
+  // turmas sem professor definido: o professor de exemplo (dev-prof) só enxerga t1, t5 e t6 no Diário
+  const semProfessor = { professorId: null, professorNome: null };
+  turma('t2', 'Design 2026.1 — Tarde', 'c2', 2, 0, 'aberta', semProfessor);
+  turma('t3', 'Robótica 2026.1', 'c3', 3, 0, 'aberta', semProfessor);
+  turma('t4', 'Fotografia 2026.1', 'c4', 2, 0, 'aberta', semProfessor);
+  turma('t7', 'Python 2026.1 — Manhã', 'c5', 3, 0, 'aberta', semProfessor);
+  turma('t6', 'Web 2025.2 — Noite', 'c1', 10, 4, 'em_andamento', { dataInicio: '2025-08-04', dataFim: '2025-12-10' });
   turma('t5', 'Web 2025.1 — Encerrada', 'c1', 10, 0, 'encerrada');
 
   // --- alunos e matrículas já existentes (mantêm vagasOcupadas coerente com as turmas) ---
-  const aluno = (id, nome, status = 'ativo') =>
-    store.set(`alunos/${id}`, { nome, email: `${id}@exemplo.com`, telefone: '(11) 90000-0000', cpf: '', dataNascimento: null, responsavel: null, endereco: null, documentos: [], observacoes: '', status, ...auditoria(90) });
+  const aluno = (id, nome, status = 'ativo', extras = {}) =>
+    store.set(`alunos/${id}`, { nome, email: `${id}@exemplo.com`, telefone: '(11) 90000-0000', cpf: '', dataNascimento: null, responsavel: null, endereco: null, documentos: [], observacoes: '', status, ...auditoria(90), ...extras });
+  const endereco = (cidade, bairro) => ({ cidade, bairro });
+  const anoAtual = new Date(agora).getFullYear();
+  // documento de exemplo (imagem de 1 pixel): serve para mostrar a lista de documentos na ficha
+  const documentoExemplo = { nome: 'rg-frente.png', url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', publicId: 'fudev/alunos/documentos/exemplo01', tipo: 'image', formato: 'png', bytes: 70 };
   const matricula = (turmaId, alunoId, status, frequencia, riscoEvasao = false, media = null) => {
     const t = store.get(`turmas/${turmaId}`);
     const a = store.get(`alunos/${alunoId}`);
     store.set(`matriculas/${turmaId}_${alunoId}`, {
-      alunoId, alunoNome: a.nome, turmaId, turmaNome: t.nome, cursoId: t.cursoId, cursoNome: t.cursoNome,
+      alunoId, alunoNome: a.nomeSocial || a.nome, turmaId, turmaNome: t.nome, // a cópia usa o nome social, se houver cursoId: t.cursoId, cursoNome: t.cursoNome,
       inscricaoId: null, dataMatricula: '2025-07-28', status, frequencia, riscoEvasao, media, ...auditoria(90),
     });
   };
   const freq = (aulas, presencas, faltas, justificadas, faltasConsecutivas, percentual) => ({ aulas, presencas, faltas, justificadas, faltasConsecutivas, percentual });
-  aluno('a-lia', 'Lia Fernandes');
-  aluno('a-caio', 'Caio Barros');
-  aluno('a-nina', 'Nina Moraes');
-  aluno('a-tomas', 'Tomás Rezende');
-  aluno('a-olga', 'Olga Prado', 'evadido');
+  aluno('a-lia', 'Lia Fernandes', 'ativo', { cpf: '52998224725', dataNascimento: '2001-04-12', genero: 'mulher_cis', endereco: endereco('São Paulo', 'Lapa'), documentos: [documentoExemplo] });
+  aluno('a-caio', 'Caio Barros', 'ativo', { dataNascimento: '1999-09-30', genero: 'homem_cis', endereco: endereco('Osasco', 'Centro') });
+  aluno('a-nina', 'Nina Moraes', 'ativo', { dataNascimento: '2003-01-22', observacoes: 'Trabalha à tarde; costuma faltar às quartas.' });
+  aluno('a-tomas', 'Tomás Rezende', 'ativo', { cpf: '11144477735', dataNascimento: '1997-11-05' });
+  aluno('a-olga', 'Olga Prado', 'evadido', { dataNascimento: '2000-07-18' });
+  aluno('a-bia', 'Beatriz Lopes', 'ativo', {
+    nomeSocial: 'Bia Lopes', // as telas mostram o nome social; o civil aparece como informação secundária
+    genero: 'nao_binario',
+    dataNascimento: `${anoAtual - 15}-06-15`, // menor de idade: tem responsável
+    responsavel: { nome: 'Marta Lopes', telefone: '(11) 98888-1212', parentesco: 'mãe' },
+    endereco: endereco('São Paulo', 'Pirituba'),
+  });
+  aluno('a-davi', 'Davi Nogueira', 'inativo', { dataNascimento: '1998-02-09', genero: 'outro', generoOutro: 'Demigênero' }); // concluiu a turma de 2025.1
   matricula('t1', 'a-lia', 'ativa', freq(0, 0, 0, 0, 0, 100));
   matricula('t6', 'a-caio', 'ativa', freq(10, 9, 1, 0, 0, 90), false, 8.2);
   matricula('t6', 'a-nina', 'ativa', freq(10, 6, 4, 0, 3, 60), true, 5.5); // em risco de evasão
   matricula('t6', 'a-tomas', 'ativa', freq(10, 8, 1, 1, 0, 90), false, 7.4);
+  matricula('t6', 'a-bia', 'ativa', freq(10, 10, 0, 0, 0, 100), false, 9.1);
   matricula('t6', 'a-olga', 'evadida', freq(10, 3, 7, 0, 7, 30), false, 4);
+  matricula('t5', 'a-davi', 'concluida', freq(20, 19, 1, 0, 0, 95), false, 8.8);
+
+  // --- diário: 10 aulas da turma t6, coerentes com o resumo de frequência das matrículas acima ---
+  // (regravar uma aula sem mudar nada produz exatamente os mesmos números)
+  const datasT6 = ['2025-08-04', '2025-08-06', '2025-08-11', '2025-08-13', '2025-08-18', '2025-08-20', '2025-08-25', '2025-08-27', '2025-09-01', '2025-09-03'];
+  const conteudosT6 = [
+    'Apresentação da turma e instalação do ambiente', 'HTML: estrutura da página', 'HTML: textos, listas e links', 'HTML: imagens e formulários',
+    'CSS: seletores e cores', 'CSS: caixa e espaçamento', 'CSS: layout com flexbox', 'CSS: responsividade',
+    'JavaScript: variáveis e tipos', 'JavaScript: funções e eventos',
+  ];
+  const marcasT6 = {
+    // uma letra por aula, na ordem das datas: P presente, F falta, J falta justificada
+    'a-caio': 'PPPPPFPPPP', // 9P 1F
+    'a-nina': 'PPPPFPPFFF', // 6P 4F, três faltas seguidas no fim → risco de evasão
+    'a-tomas': 'PPPFPPPJPP', // 8P 1F 1J
+    'a-bia': 'PPPPPPPPPP', // 10P
+    'a-olga': 'PPPFFFFFFF', // 3P 7F
+  };
+  datasT6.forEach((data, i) => {
+    const registros = Object.fromEntries(Object.entries(marcasT6).map(([alunoId, sequencia]) => [alunoId, sequencia[i]]));
+    const marcas = Object.values(registros);
+    store.set(`aulas/t6_${data}`, {
+      turmaId: 't6', data, conteudo: conteudosT6[i], professorId: 'dev-prof', registros,
+      resumo: { presentes: marcas.filter((m) => m === 'P').length, faltas: marcas.filter((m) => m === 'F').length, justificadas: marcas.filter((m) => m === 'J').length },
+      ...auditoria(90),
+    });
+  });
 
   // --- editais, um em cada etapa ---
   const requisitos = [
@@ -132,4 +174,11 @@ export function semear(store, Timestamp) {
   ['Vera Campos', 'Wagner Dias', 'Xavier Leal'].forEach((nome, i) => inscricao(`a${i + 1}`, 'ed3', 't4', nome, i));
   ['Yara Neves', 'Zeca Prado', 'Alice Rangel', 'Bento Salles', 'Cíntia Duarte']
     .forEach((nome, i) => inscricao(`k${i + 1}`, 'ed5', 't7', nome, i * 30, { criadoEm: ts(agora - 1 * DIA + i * 30 * MIN) }));
+
+  // nome social e gênero de exemplo (o gênero "outro" traz o texto escrito pela própria pessoa)
+  Object.assign(store.get('inscricoes/i5'), { nome: 'Eliseu Rocha', nomeSocial: 'Elisa Rocha', genero: 'mulher_trans' });
+  Object.assign(store.get('inscricoes/i2'), { genero: 'homem_cis' });
+  Object.assign(store.get('inscricoes/i7'), { genero: 'nao_informar' });
+  Object.assign(store.get('inscricoes/k2'), { genero: 'outro', generoOutro: 'Bigênero' });
+  Object.assign(store.get('inscricoes/k4'), { nomeSocial: 'Ben Salles', genero: 'homem_trans' });
 }

@@ -40,6 +40,42 @@ export const ROTULO_STATUS_INSCRICAO = Object.freeze({
   desistente: 'Desistente',
 });
 
+export const ROTULO_GENERO = Object.freeze({
+  mulher_cis: 'Mulher cis',
+  homem_cis: 'Homem cis',
+  mulher_trans: 'Mulher trans',
+  homem_trans: 'Homem trans',
+  travesti: 'Travesti',
+  nao_binario: 'Pessoa não binária',
+  genero_fluido: 'Gênero fluido',
+  agenero: 'Agênero',
+  outro: 'Outro (quero escrever)',
+  nao_informar: 'Prefiro não informar',
+});
+
+export const ROTULO_STATUS_ALUNO = Object.freeze({
+  ativo: 'Ativo',
+  inativo: 'Inativo',
+  evadido: 'Evadido',
+});
+
+export const ROTULO_STATUS_MATRICULA = Object.freeze({
+  ativa: 'Ativa',
+  trancada: 'Trancada',
+  evadida: 'Evadida',
+  concluida: 'Concluída',
+  cancelada: 'Cancelada',
+});
+
+/** Texto do botão que leva uma matrícula para a situação indicada (pela situação de destino). */
+export const ROTULO_ACAO_MATRICULA = Object.freeze({
+  ativa: 'Reativar',
+  trancada: 'Trancar',
+  evadida: 'Marcar como evadida',
+  concluida: 'Concluir',
+  cancelada: 'Cancelar matrícula',
+});
+
 export const ROTULO_STATUS_TURMA = Object.freeze({
   planejada: 'Planejada',
   aberta: 'Aberta',

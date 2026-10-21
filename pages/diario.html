@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Diário de classe · FUDEV</title>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <noscript><style>body[data-auth] { visibility: visible; }</style></noscript>
+  </head>
+  <body data-auth="pending">
+    <div class="app">
+      <aside class="sidebar" id="sidebar"></aside>
+
+      <main class="principal">
+        <header class="topo">
+          <h1>Diário de classe</h1>
+          <p class="topo__sub" id="sub">Registre a chamada e o conteúdo de cada aula.</p>
+        </header>
+
+        <div class="barra">
+          <div class="campo">
+            <label for="d-turma">Turma</label>
+            <select id="d-turma"></select>
+          </div>
+          <div class="campo">
+            <label for="d-data">Data da aula</label>
+            <div class="linha-add">
+              <input id="d-data" type="date" />
+              <button class="botao botao--fantasma" type="button" id="btn-hoje">Hoje</button>
+            </div>
+          </div>
+        </div>
+
+        <p class="aviso aviso--info" id="d-aviso" hidden></p>
+
+        <section class="cartao" id="chamada" hidden>
+          <header class="chamada__topo">
+            <div>
+              <h2 id="chamada-titulo"></h2>
+              <p class="item__meta" id="chamada-estado"></p>
+            </div>
+            <div class="item__acoes">
+              <button class="botao botao--fantasma" type="button" id="btn-todos-presentes">Marcar todos presentes</button>
+              <button class="botao botao--fantasma" type="button" id="btn-limpar">Limpar marcações</button>
+            </div>
+          </header>
+
+          <p class="item__meta">
+            <strong>P</strong> presente · <strong>F</strong> falta · <strong>J</strong> falta justificada
+            <span id="chamada-totais"></span>
+          </p>
+          <ul class="chamada" id="chamada-lista"></ul>
+
+          <div class="campo">
+            <label for="d-conteudo">Conteúdo da aula</label>
+            <textarea id="d-conteudo" maxlength="1000" placeholder="O que foi trabalhado nesta aula"></textarea>
+          </div>
+
+          <p class="aviso" id="d-erro" role="alert" hidden></p>
+          <div class="item__acoes">
+            <button class="botao" type="button" id="btn-salvar">Salvar aula</button>
+            <button class="botao botao--fantasma" type="button" id="btn-excluir" hidden>Excluir aula</button>
+          </div>
+        </section>
+
+        <h2 class="subtitulo" id="titulo-aulas" hidden>Aulas registradas</h2>
+        <section class="lista" id="aulas" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <script type="module" src="../js/pages/diario.js"></script>
+  </body>
+</html>

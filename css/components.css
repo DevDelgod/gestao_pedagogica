@@ -597,6 +597,157 @@ fieldset.campo legend {
   overflow-wrap: anywhere;
 }
 
+.atalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3) var(--espaco-5);
+  margin-bottom: var(--espaco-4);
+}
+
+.atalho p {
+  margin: 0;
+}
+
+a.botao {
+  text-decoration: none;
+}
+
+/* ---------- diário de classe: chamada ---------- */
+.subtitulo {
+  margin: var(--espaco-6) 0 var(--espaco-3);
+  font-size: 1.1rem;
+}
+
+.chamada__topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  margin-bottom: var(--espaco-3);
+}
+
+.chamada {
+  display: grid;
+  gap: var(--espaco-2);
+  margin: var(--espaco-3) 0 var(--espaco-4);
+  padding: 0;
+  list-style: none;
+}
+
+.chamada__linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2) var(--espaco-4);
+  padding: var(--espaco-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+}
+
+.chamada__linha--pendente {
+  border-color: var(--cor-erro);
+}
+
+.chamada__pessoa {
+  display: grid;
+  flex: 1 1 220px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.marcas {
+  display: flex;
+  gap: var(--espaco-1);
+}
+
+.marca {
+  min-width: 48px;
+  min-height: 44px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.marca:hover {
+  background: var(--cor-superficie-2);
+}
+
+.marca[aria-pressed='true'].marca--p {
+  border-color: var(--cor-sucesso);
+  background: var(--cor-sucesso-fundo);
+  color: var(--cor-sucesso);
+}
+
+.marca[aria-pressed='true'].marca--f {
+  border-color: var(--cor-erro);
+  background: var(--cor-erro-fundo);
+  color: var(--cor-erro);
+}
+
+.marca[aria-pressed='true'].marca--j {
+  border-color: var(--cor-atencao);
+  background: var(--cor-atencao-fundo);
+  color: var(--cor-atencao);
+}
+
+/* seções dentro de um diálogo longo (ficha do aluno) */
+.secao-ficha {
+  margin-top: var(--espaco-5);
+  padding-top: var(--espaco-4);
+  border-top: 1px solid var(--cor-borda);
+}
+
+.secao-ficha h3 {
+  margin-bottom: var(--espaco-3);
+  font-size: 1rem;
+}
+
+.sublista {
+  display: grid;
+  gap: var(--espaco-2);
+  margin: 0 0 var(--espaco-3);
+  padding: 0;
+  list-style: none;
+}
+
+.subitem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2) var(--espaco-4);
+  padding: var(--espaco-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+}
+
+.subitem__texto {
+  display: grid;
+  flex: 1 1 260px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.subitem__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.botao--pequeno {
+  min-height: 32px;
+  padding: 0 var(--espaco-3);
+  font-size: 0.85rem;
+}
+
 .dialogo details {
   margin-top: var(--espaco-3);
 }

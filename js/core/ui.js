@@ -52,6 +52,12 @@ export function toast(mensagem, tipo = 'info') {
     pilha.setAttribute('aria-live', 'polite');
     document.body.append(pilha);
   }
+  // Um <dialog> modal fica acima de tudo (camada superior): com um aberto, o aviso precisa morar
+  // dentro dele para aparecer. Sem diálogo aberto, volta para o <body>.
+  const modal = $$('dialog[open]').at(-1);
+  const destino = modal ?? document.body;
+  if (pilha.parentElement !== destino) destino.append(pilha);
+
   const item = document.createElement('div');
   item.className = `toast toast--${tipo}`;
   item.textContent = mensagem;

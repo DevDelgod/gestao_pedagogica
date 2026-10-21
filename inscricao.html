@@ -31,8 +31,13 @@
             <select id="in-turma"></select>
           </div>
           <div class="campo">
-            <label for="in-nome">Nome completo</label>
+            <label for="in-nome">Nome completo (como no documento)</label>
             <input id="in-nome" maxlength="120" autocomplete="name" />
+          </div>
+          <div class="campo">
+            <label for="in-nome-social">Nome social (opcional)</label>
+            <input id="in-nome-social" maxlength="120" autocomplete="nickname" aria-describedby="ajuda-nome-social" />
+            <small class="campo__ajuda" id="ajuda-nome-social">É o nome que usaremos para te chamar. Se você deixar em branco, usamos o nome completo.</small>
           </div>
           <div class="campo">
             <label for="in-email">E-mail</label>
@@ -41,6 +46,15 @@
           <div class="campo">
             <label for="in-telefone">Telefone ou WhatsApp (opcional)</label>
             <input id="in-telefone" type="tel" maxlength="30" autocomplete="tel" />
+          </div>
+          <div class="campo">
+            <label for="in-genero">Gênero (opcional)</label>
+            <select id="in-genero" aria-describedby="ajuda-genero"></select>
+            <small class="campo__ajuda" id="ajuda-genero">Você pode escolher uma opção, escrever o seu gênero em "Outro" ou preferir não informar.</small>
+          </div>
+          <div class="campo" id="campo-genero-outro" hidden>
+            <label for="in-genero-outro">Como você se identifica?</label>
+            <input id="in-genero-outro" maxlength="60" autocomplete="off" />
           </div>
           <div class="campo">
             <label for="in-mensagem">Mensagem (opcional)</label>

@@ -5,6 +5,7 @@ import { formatarData, formatarDataHora, hojeISO } from '../core/datas.js';
 import { ErroDeNegocio } from '../core/erros.js';
 import { MODALIDADE_SELECAO as M, PAPEIS, STATUS_EDITAL as E, STATUS_INSCRICAO as S } from '../models/schema.js';
 import { ROTULO_MODALIDADE, ROTULO_STATUS_INSCRICAO } from '../models/rotulos.js';
+import { nomeExibicao, rotuloDoGenero, temNomeSocial } from '../domain/pessoa.js';
 import { temSelecaoAutomatica, verificarSorteio } from '../domain/selecao.js';
 import { avancarEtapa, editaisRepo, listarEditais } from '../services/editais.service.js';
 import {
@@ -302,11 +303,13 @@ function itemHtml(i) {
     !estado.turmaId ? `<strong>${escapar(nomeTurma(i.turmaId))}</strong>` : '',
     `recebida em ${formatarDataHora(i.criadoEm)}`,
   ].filter(Boolean);
+  const genero = rotuloDoGenero(i);
 
   return `
     <article class="cartao item" data-id="${escapar(i.id)}">
       <div class="item__principal">
-        <h2 class="item__titulo">${escapar(i.nome)}</h2>
+        <h2 class="item__titulo">${escapar(nomeExibicao(i))}</h2>
+        ${temNomeSocial(i) || genero ? `<p class="item__meta">${[temNomeSocial(i) ? `Nome civil: ${escapar(i.nome)}` : '', genero ? `Gênero: ${escapar(genero)}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
         <p class="item__meta"><a href="mailto:${escapar(i.email)}">${escapar(i.email)}</a>${i.telefone ? ` · ${escapar(i.telefone)}` : ''}</p>
         <p class="item__meta">${meta.join(' · ')}</p>
         ${i.mensagem ? `<p class="item__mensagem">${escapar(i.mensagem)}</p>` : ''}
@@ -328,7 +331,7 @@ function detalhes(i) {
       const nota =
         ed.modalidade === M.PROVA && !consulta
           ? `<label class="item__meta">Nota <input class="entrada-pequena" type="number" step="0.1" min="0" max="${ed.config.notaMaxima}"
-               value="${i.nota ?? ''}" data-acao="nota" aria-label="Nota de ${escapar(i.nome)}" /></label>`
+               value="${i.nota ?? ''}" data-acao="nota" aria-label="Nota de ${escapar(nomeExibicao(i))}" /></label>`
           : ed.modalidade === M.PROVA
             ? `<span class="item__meta">Nota: ${i.nota ?? '—'}</span>`
             : '';
@@ -409,13 +412,13 @@ $lista.addEventListener('click', async (evento) => {
     case 'convocar':
       return executar(async () => {
         await convocarInscricao(i.id);
-        toast(`${i.nome} convocado(a). A vaga ficou reservada.`, 'sucesso');
+        toast(`Convocação registrada: ${nomeExibicao(i)}. A vaga ficou reservada.`, 'sucesso');
       }, botao);
 
     case 'matricular':
       return executar(async () => {
         const r = await efetivarMatricula(i.id);
-        toast(`Matrícula efetivada: ${i.nome} na turma ${r.turmaNome}. ${r.alunoNovo ? 'Cadastro criado.' : 'Cadastro existente reaproveitado.'}`, 'sucesso');
+        toast(`Matrícula efetivada: ${nomeExibicao(i)} na turma ${r.turmaNome}. ${r.alunoNovo ? 'Cadastro criado.' : 'Cadastro existente reaproveitado.'}`, 'sucesso');
       }, botao);
 
     case 'indeferir':
@@ -466,7 +469,7 @@ $('#painel-turma').addEventListener('click', (evento) => {
   if (botao.dataset.acao === 'proximo-remanescente') {
     return executar(async () => {
       const remanescente = await convocarProximoRemanescente({ editalId: estado.edital.id, turmaId: estado.turmaId });
-      toast(`${remanescente.nome} (remanescente nº ${remanescente.posicaoRemanescente}) foi convocado(a).`, 'sucesso');
+      toast(`Convocação do remanescente nº ${remanescente.posicaoRemanescente}: ${nomeExibicao(remanescente)}. A vaga ficou reservada.`, 'sucesso');
     }, botao);
   }
 });
@@ -486,7 +489,7 @@ const MOTIVO = {
 function abrirMotivo(modo, inscricao) {
   estado.alvo = { modo, inscricao };
   $('#motivo-titulo').textContent = MOTIVO[modo].titulo;
-  $('#motivo-resumo').textContent = `${inscricao.nome} · ${nomeTurma(inscricao.turmaId)}.${MOTIVO[modo].nota}`;
+  $('#motivo-resumo').textContent = `${nomeExibicao(inscricao)} · ${nomeTurma(inscricao.turmaId)}.${MOTIVO[modo].nota}`;
   $('#motivo-confirmar').textContent = MOTIVO[modo].botao;
   $('#motivo-confirmar').disabled = false;
   $('#motivo-texto').value = '';
@@ -504,7 +507,7 @@ $('#form-motivo').addEventListener('submit', async (evento) => {
     if (modo === 'indeferir') await indeferirInscricao(inscricao.id, motivo);
     else await desistirDaVaga(inscricao.id, motivo);
     dlgMotivo.close();
-    toast(modo === 'indeferir' ? `Inscrição de ${inscricao.nome} indeferida.` : 'Vaga liberada na turma.', 'sucesso');
+    toast(modo === 'indeferir' ? `Inscrição de ${nomeExibicao(inscricao)} indeferida.` : 'Vaga liberada na turma.', 'sucesso');
     await recarregar().then(renderizar, () => {});
   } catch (erro) {
     if (erro instanceof ErroDeNegocio) {
@@ -637,7 +640,7 @@ function abrirRegistro(turmaId) {
 
   const nome = (id) => {
     const i = estado.itens.find((x) => x.id === id);
-    return i ? `${escapar(i.nome)} <span class="item__meta">(${escapar(i.email)})</span>` : escapar(id);
+    return i ? `${escapar(nomeExibicao(i))} <span class="item__meta">(${escapar(i.email)})</span>` : escapar(id);
   };
   const grupo = (titulo, ids) =>
     ids.length

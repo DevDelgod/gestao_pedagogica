@@ -18,8 +18,8 @@ const MENU = [
   { id: 'turmas', rotulo: 'Turmas', pronto: true, papeis: GESTAO },
   { id: 'editais', rotulo: 'Editais', pronto: true, papeis: GESTAO },
   { id: 'inscricoes', rotulo: 'Inscrições', pronto: true, papeis: GESTAO },
-  { id: 'alunos', rotulo: 'Alunos', pronto: false },
-  { id: 'diario', rotulo: 'Diário de classe', pronto: false },
+  { id: 'alunos', rotulo: 'Alunos', pronto: true, papeis: GESTAO },
+  { id: 'diario', rotulo: 'Diário de classe', pronto: true }, // todos os papéis: o professor usa aqui
   { id: 'avaliacoes', rotulo: 'Avaliações', pronto: false },
 ];
 

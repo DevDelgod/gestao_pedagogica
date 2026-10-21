@@ -33,12 +33,26 @@ export const serverTimestamp = () => SERVER_TS;
 export const increment = (n) => ({ __incremento: n });
 
 const lerStorage = (chave) => { try { return localStorage.getItem(chave); } catch { return null; } };
-const gravarStorage = (chave, valor) => { try { valor === null ? localStorage.removeItem(chave) : localStorage.setItem(chave, valor); } catch { /* sem armazenamento: segue só em memória */ } };
+/** Devolve false se o navegador recusar (armazenamento cheio ou bloqueado): os dados seguem só em memória. */
+const gravarStorage = (chave, valor) => {
+  try {
+    valor === null ? localStorage.removeItem(chave) : localStorage.setItem(chave, valor);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 const store = new Map(); // 'colecao/id' -> dados
 
+let avisouArmazenamentoCheio = false;
 function salvar() {
-  gravarStorage(CHAVE_DADOS, JSON.stringify({ versao: SEED_VERSAO, docs: [...store] }, (_, v) => (v instanceof Timestamp ? { __ts: v.ms } : v)));
+  const ok = gravarStorage(CHAVE_DADOS, JSON.stringify({ versao: SEED_VERSAO, docs: [...store] }, (_, v) => (v instanceof Timestamp ? { __ts: v.ms } : v)));
+  if (!ok && !avisouArmazenamentoCheio) {
+    avisouArmazenamentoCheio = true; // sem isto os dados sumiriam na recarga sem ninguém perceber
+    console.warn('[modo dev] Armazenamento do navegador cheio: as alterações não estão sendo salvas.');
+    document.querySelector('#dev-faixa span')?.replaceChildren('ATENÇÃO: armazenamento do navegador cheio. As últimas alterações não serão salvas.');
+  }
 }
 
 function carregar() {
