@@ -1,0 +1,59 @@
+/* Design tokens — mude as cores/espaços aqui e o sistema inteiro acompanha. */
+:root {
+  color-scheme: light dark;
+
+  --cor-fundo: #f5f6fa;
+  --cor-superficie: #ffffff;
+  --cor-superficie-2: #eef0f6;
+  --cor-borda: #e1e4ee;
+  --cor-texto: #191d2b;
+  --cor-texto-suave: #596074;
+
+  --cor-primaria: #4f46e5;
+  --cor-primaria-hover: #4338ca;
+  --cor-sobre-primaria: #ffffff;
+
+  --cor-sucesso: #15803d;
+  --cor-sucesso-fundo: #e7f6ec;
+  --cor-atencao: #b45309;
+  --cor-atencao-fundo: #fdf1dc;
+  --cor-erro: #b91c1c;
+  --cor-erro-fundo: #fce9e9;
+
+  --fonte: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --raio: 10px;
+  --sombra: 0 1px 2px rgb(20 24 40 / 6%), 0 4px 14px rgb(20 24 40 / 5%);
+
+  --espaco-1: 4px;
+  --espaco-2: 8px;
+  --espaco-3: 12px;
+  --espaco-4: 16px;
+  --espaco-5: 24px;
+  --espaco-6: 32px;
+
+  --largura-sidebar: 232px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cor-fundo: #11131c;
+    --cor-superficie: #1a1d2a;
+    --cor-superficie-2: #232737;
+    --cor-borda: #2c3144;
+    --cor-texto: #eceef6;
+    --cor-texto-suave: #9aa1b8;
+
+    --cor-primaria: #7c74ff;
+    --cor-primaria-hover: #968fff;
+    --cor-sobre-primaria: #11131c;
+
+    --cor-sucesso: #4ade80;
+    --cor-sucesso-fundo: #12301d;
+    --cor-atencao: #fbbf24;
+    --cor-atencao-fundo: #36280d;
+    --cor-erro: #f87171;
+    --cor-erro-fundo: #381617;
+
+    --sombra: 0 1px 2px rgb(0 0 0 / 30%), 0 4px 14px rgb(0 0 0 / 25%);
+  }
+}

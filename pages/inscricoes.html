@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inscrições · Incubadora</title>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <noscript><style>body[data-auth] { visibility: visible; }</style></noscript>
+  </head>
+  <body data-auth="pending">
+    <div class="app">
+      <aside class="sidebar" id="sidebar"></aside>
+
+      <main class="principal">
+        <header class="topo">
+          <h1>Inscrições</h1>
+          <p class="topo__sub" id="sub">Selecione um edital para acompanhar as inscrições, a seleção e as matrículas.</p>
+        </header>
+
+        <div class="barra">
+          <div class="campo">
+            <label for="sel-edital">Edital</label>
+            <select id="sel-edital"></select>
+          </div>
+          <div class="campo">
+            <label for="sel-turma">Turma</label>
+            <select id="sel-turma"></select>
+          </div>
+        </div>
+
+        <!-- vagas da turma + ações de seleção -->
+        <section class="cartao painel-turma" id="painel-turma" hidden></section>
+
+        <div class="abas" role="tablist" id="abas" aria-label="Situação da inscrição"></div>
+        <section class="lista" id="lista" role="tabpanel" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <!-- Motivo (indeferir / desistência) -->
+    <dialog class="dialogo" id="dlg-motivo" aria-labelledby="motivo-titulo">
+      <form id="form-motivo" novalidate>
+        <h2 id="motivo-titulo"></h2>
+        <p class="dialogo__sub" id="motivo-resumo"></p>
+        <p class="aviso" id="motivo-erro" role="alert" hidden></p>
+        <div class="campo">
+          <label for="motivo-texto">Motivo (opcional)</label>
+          <textarea id="motivo-texto" maxlength="300"></textarea>
+        </div>
+        <div class="dialogo__acoes">
+          <button class="botao botao--fantasma" type="button" data-fechar>Cancelar</button>
+          <button class="botao botao--perigo" type="submit" id="motivo-confirmar"></button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Executar seleção -->
+    <dialog class="dialogo" id="dlg-selecao" aria-labelledby="selecao-titulo">
+      <form id="form-selecao" novalidate>
+        <h2 id="selecao-titulo"></h2>
+        <p class="dialogo__sub" id="selecao-resumo"></p>
+        <p class="aviso aviso--info" id="selecao-info"></p>
+        <p class="aviso" id="selecao-erro" role="alert" hidden></p>
+        <div class="campo" id="selecao-campo-semente">
+          <label for="selecao-semente">Semente do sorteio (opcional)</label>
+          <input id="selecao-semente" maxlength="120" autocomplete="off" />
+          <small class="campo__ajuda">Em branco, o sistema gera uma. Se o edital usa um dado público (por exemplo, números da Loteria Federal), digite-o aqui: qualquer pessoa poderá refazer o sorteio e conferir.</small>
+        </div>
+        <p class="item__meta"><strong>Esta ação não pode ser desfeita</strong> e só pode ser executada uma vez por turma.</p>
+        <div class="dialogo__acoes">
+          <button class="botao botao--fantasma" type="button" data-fechar>Cancelar</button>
+          <button class="botao" type="submit" id="selecao-confirmar">Executar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Registro auditável da seleção -->
+    <dialog class="dialogo dialogo--largo" id="dlg-registro" aria-labelledby="registro-titulo">
+      <h2 id="registro-titulo">Registro da seleção</h2>
+      <div id="registro-corpo"></div>
+      <div class="dialogo__acoes">
+        <button class="botao botao--fantasma" type="button" data-fechar>Fechar</button>
+      </div>
+    </dialog>
+
+    <script type="module" src="../js/pages/inscricoes.js"></script>
+  </body>
+</html>

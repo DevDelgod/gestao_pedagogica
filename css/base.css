@@ -1,0 +1,112 @@
+/* Reset, tipografia e layout geral (menu lateral + conteúdo). */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font: 15px/1.5 var(--fonte);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.2;
+}
+
+a {
+  color: var(--cor-primaria);
+}
+
+/* O atributo hidden precisa vencer qualquer `display` definido por classes (ex.: .campo { display: grid }). */
+[hidden] {
+  display: none !important;
+}
+
+:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+/* Páginas internas ficam invisíveis até exigirLogin() confirmar o acesso (evita "piscar" conteúdo). */
+body[data-auth='pending'] {
+  visibility: hidden;
+}
+
+/* ---------- layout: menu lateral + conteúdo ---------- */
+.app {
+  display: grid;
+  grid-template-columns: var(--largura-sidebar) minmax(0, 1fr); /* minmax(0, …) impede o conteúdo de alargar a coluna */
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+  padding: var(--espaco-5) var(--espaco-4);
+  background: var(--cor-superficie);
+  border-right: 1px solid var(--cor-borda);
+}
+
+.principal {
+  min-width: 0;
+  padding: var(--espaco-6);
+  max-width: 1200px;
+}
+
+.topo {
+  margin-bottom: var(--espaco-5);
+}
+
+.topo--acao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espaco-4);
+}
+
+.topo h1 {
+  font-size: 1.6rem;
+}
+
+.topo__sub {
+  margin: var(--espaco-1) 0 0;
+  color: var(--cor-texto-suave);
+}
+
+@media (max-width: 800px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--espaco-3);
+    padding: var(--espaco-3) var(--espaco-4);
+    border-right: 0;
+    border-bottom: 1px solid var(--cor-borda);
+  }
+
+  .principal {
+    padding: var(--espaco-4);
+  }
+}

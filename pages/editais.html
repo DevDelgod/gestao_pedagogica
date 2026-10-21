@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Editais · Incubadora</title>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <noscript><style>body[data-auth] { visibility: visible; }</style></noscript>
+  </head>
+  <body data-auth="pending">
+    <div class="app">
+      <aside class="sidebar" id="sidebar"></aside>
+
+      <main class="principal">
+        <header class="topo topo--acao">
+          <div>
+            <h1>Editais</h1>
+            <p class="topo__sub">Cada edital define como as vagas são preenchidas e o que é preciso para se matricular.</p>
+          </div>
+          <button class="botao" type="button" id="btn-novo">Novo edital</button>
+        </header>
+
+        <section class="lista" id="lista" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <dialog class="dialogo dialogo--largo" id="dlg-edital" aria-labelledby="edital-titulo-dlg">
+      <form id="form-edital" novalidate>
+        <h2 id="edital-titulo-dlg">Novo edital</h2>
+        <p class="dialogo__sub">Enquanto for rascunho, tudo pode ser editado. Depois de abrir as inscrições, não mais.</p>
+
+        <p class="aviso" id="edital-erro" role="alert" hidden></p>
+
+        <div class="campo">
+          <label for="ed-titulo">Título</label>
+          <input id="ed-titulo" maxlength="120" placeholder="Ex.: Edital 01/2026 — Cursos de Tecnologia" />
+        </div>
+
+        <div class="campo">
+          <label for="ed-descricao">Descrição (opcional)</label>
+          <textarea id="ed-descricao" maxlength="1000"></textarea>
+        </div>
+
+        <div class="campo">
+          <label for="ed-modalidade">Como as vagas são preenchidas</label>
+          <select id="ed-modalidade"></select>
+          <small class="campo__ajuda" id="ed-modalidade-ajuda"></small>
+        </div>
+
+        <div class="grade-2">
+          <div class="campo">
+            <label for="ed-inicio">Início das inscrições</label>
+            <input id="ed-inicio" type="datetime-local" />
+          </div>
+          <div class="campo">
+            <label for="ed-fim">Fim das inscrições</label>
+            <input id="ed-fim" type="datetime-local" />
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="ed-resultado">Data do resultado (divulgada no edital)</label>
+          <input id="ed-resultado" type="date" />
+        </div>
+
+        <fieldset class="campo">
+          <legend>Turmas ofertadas</legend>
+          <div class="opcoes" id="ed-turmas"></div>
+        </fieldset>
+
+        <fieldset class="campo">
+          <legend>Requisitos para a matrícula</legend>
+          <div class="chips" id="ed-requisitos"></div>
+          <div class="linha-add">
+            <select id="ed-req-tipo" aria-label="Tipo de requisito"></select>
+            <input id="ed-req-rotulo" maxlength="60" placeholder="Ex.: Documentos pessoais" aria-label="Nome do requisito" />
+            <button class="botao botao--fantasma" type="button" id="ed-req-add">Adicionar</button>
+          </div>
+          <small class="campo__ajuda">A equipe marca cada requisito como cumprido antes de efetivar a matrícula.</small>
+        </fieldset>
+
+        <fieldset class="campo">
+          <legend>Regras</legend>
+          <label class="check"><input id="ed-lista-espera" type="checkbox" /> Formar lista de espera (suplentes)</label>
+          <div class="grade-2">
+            <div class="campo">
+              <label for="ed-prazo">Prazo para o convocado se matricular (dias)</label>
+              <input id="ed-prazo" type="number" min="1" step="1" />
+            </div>
+            <div class="campo" data-so="prova">
+              <label for="ed-nota-min">Nota mínima</label>
+              <input id="ed-nota-min" type="number" min="0" step="0.1" />
+            </div>
+            <div class="campo" data-so="prova">
+              <label for="ed-nota-max">Nota máxima da prova</label>
+              <input id="ed-nota-max" type="number" min="1" step="0.1" />
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="dialogo__acoes">
+          <button class="botao botao--fantasma" type="button" data-fechar>Cancelar</button>
+          <button class="botao" type="submit" id="edital-salvar">Salvar rascunho</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="../js/pages/editais.js"></script>
+  </body>
+</html>

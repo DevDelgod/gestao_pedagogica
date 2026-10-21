@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Entrar · Incubadora</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <main class="login">
+      <section class="cartao login__caixa">
+        <h1 class="login__titulo">Incubadora</h1>
+        <p class="login__sub">Entre para acessar a gestão acadêmica.</p>
+
+        <p class="aviso" id="mensagem" role="alert" hidden></p>
+
+        <form id="form-login" novalidate>
+          <div class="campo">
+            <label for="email">E-mail</label>
+            <input id="email" name="email" type="email" autocomplete="username" required autofocus />
+          </div>
+          <div class="campo">
+            <label for="senha">Senha</label>
+            <input id="senha" name="senha" type="password" autocomplete="current-password" required />
+          </div>
+          <button class="botao botao--bloco" id="btn-entrar" type="submit">Entrar</button>
+        </form>
+
+        <p class="login__rodape">
+          <button class="link-botao" id="btn-esqueci" type="button">Esqueci minha senha</button>
+        </p>
+      </section>
+    </main>
+
+    <script type="module" src="js/pages/login.js"></script>
+  </body>
+</html>

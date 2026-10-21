@@ -1,0 +1,134 @@
+rules_version = '2';
+
+// Papéis (users/{uid}.papel):
+//   admin        — tudo, inclusive gerenciar usuários
+//   coordenador  — cadastros e matrículas (tudo, menos usuários)
+//   professor    — lê tudo; lança aulas/avaliações só das turmas que leciona
+// Quem não tem users/{uid} ativo não acessa nada. Exceção: o formulário do site pode CRIAR inscrições.
+//
+// Atenção: estas regras ainda não foram testadas no emulador. Antes de usar com dados reais,
+// rode `firebase emulators:start` ou use o "Simulador de regras" do console.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- funções auxiliares ----------
+    function logado() {
+      return request.auth != null;
+    }
+    function perfil() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function ehEquipe() {
+      return logado()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && perfil().ativo == true;
+    }
+    function ehAdmin() {
+      return ehEquipe() && perfil().papel == 'admin';
+    }
+    function ehGestao() {
+      return ehEquipe() && perfil().papel in ['admin', 'coordenador'];
+    }
+    function ehProfessor() {
+      return ehEquipe() && perfil().papel == 'professor';
+    }
+    function leciona(turmaId) {
+      return get(/databases/$(database)/documents/turmas/$(turmaId)).data.professorId == request.auth.uid;
+    }
+    // Professor só pode alterar o resumo acadêmico da matrícula (recalculado após chamada/nota).
+    function soResumoAcademico() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['frequencia', 'riscoEvasao', 'media', 'atualizadoEm']);
+    }
+
+    // ---------- equipe ----------
+    match /users/{uid} {
+      // cada pessoa lê o próprio perfil (o login precisa); gestão lê todos (lista de professores)
+      allow read: if logado() && (request.auth.uid == uid || ehGestao());
+      allow write: if ehAdmin();
+    }
+
+    // ---------- cadastros ----------
+    match /cursos/{id} {
+      allow read: if ehEquipe();
+      allow write: if ehGestao();
+    }
+
+    match /turmas/{id} {
+      allow read: if ehEquipe();
+      allow write: if ehGestao();
+    }
+
+    match /alunos/{id} {
+      allow read: if ehEquipe();
+      allow write: if ehGestao();
+    }
+
+    // ---------- editais (processos seletivos) ----------
+    match /editais/{id} {
+      // o site lê só os editais com inscrições abertas (a consulta precisa filtrar por status)
+      allow read: if ehEquipe() || resource.data.status == 'inscricoes';
+      allow write: if ehGestao();
+    }
+
+    // registro auditável de cada sorteio/classificação executado
+    match /selecoes/{id} {
+      allow read: if ehEquipe();
+      allow write: if ehGestao();
+    }
+
+    // ---------- inscrições (entrada pública pelo site) ----------
+    // A inscrição só é aceita se o edital estiver aberto, dentro da janela de datas e ofertando a turma.
+    function editalAceitaInscricao(editalId, turmaId) {
+      let edital = get(/databases/$(database)/documents/editais/$(editalId)).data;
+      return edital.status == 'inscricoes'
+        && request.time >= edital.inscricoesInicio
+        && request.time <= edital.inscricoesFim
+        && turmaId in edital.turmaIds;
+    }
+
+    match /inscricoes/{id} {
+      allow create: if request.resource.data.keys().hasAll(['nome', 'email', 'editalId', 'turmaId', 'status', 'criadoEm'])
+        && request.resource.data.keys().hasOnly(
+             ['nome', 'email', 'telefone', 'editalId', 'turmaId', 'mensagem', 'origem', 'status', 'criadoEm'])
+        && request.resource.data.status == 'inscrita'
+        && request.resource.data.criadoEm == request.time
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() > 1 && request.resource.data.nome.size() <= 120
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 4 && request.resource.data.email.size() <= 120
+        && request.resource.data.editalId is string
+        && request.resource.data.turmaId is string
+        && (!('mensagem' in request.resource.data) || request.resource.data.mensagem.size() <= 1000)
+        && editalAceitaInscricao(request.resource.data.editalId, request.resource.data.turmaId);
+      allow read, update, delete: if ehGestao();
+    }
+
+    // ---------- matrículas ----------
+    match /matriculas/{id} {
+      allow read: if ehEquipe();
+      allow create, delete: if ehGestao();
+      allow update: if ehGestao()
+        || (ehProfessor() && leciona(resource.data.turmaId) && soResumoAcademico());
+    }
+
+    // ---------- diário de classe e frequência ----------
+    match /aulas/{id} {
+      allow read: if ehEquipe();
+      allow create: if ehGestao() || (ehProfessor() && leciona(request.resource.data.turmaId));
+      allow update: if ehGestao() || (ehProfessor() && leciona(resource.data.turmaId));
+      allow delete: if ehGestao();
+    }
+
+    // ---------- avaliações e notas ----------
+    match /avaliacoes/{id} {
+      allow read: if ehEquipe();
+      allow create: if ehGestao() || (ehProfessor() && leciona(request.resource.data.turmaId));
+      allow update: if ehGestao() || (ehProfessor() && leciona(resource.data.turmaId));
+      allow delete: if ehGestao();
+    }
+
+    // Todo o resto: negado por padrão.
+  }
+}
