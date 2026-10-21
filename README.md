@@ -1,6 +1,6 @@
-# Incubadora — Gestão Acadêmica (LMS)
+# FUDEV — Gestão Acadêmica (LMS)
 
-Sistema de gestão para uma incubadora de cursos e projetos. Laboratório livre: começa pequeno e cresce módulo a módulo.
+O **FUDEV** é um sistema de gestão acadêmica para uma incubadora de cursos e projetos. Laboratório livre: começa pequeno e cresce módulo a módulo.
 
 **Stack:** HTML5 + CSS3 puro + JavaScript (ES Modules, sem build) · Firebase (Auth + Firestore) · Cloudinary (documentos e imagens).
 
@@ -8,9 +8,12 @@ Sistema de gestão para uma incubadora de cursos e projetos. Laboratório livre:
 
 ```
 gestao_pedagogica/
-├── index.html                  Login (única página pública)
+├── index.html                  Login da equipe
+├── inscricao.html              Formulário PÚBLICO de inscrição (sem login): editais abertos → turma → dados
 ├── pages/                      Uma página .html por tela interna
 │   ├── dashboard.html          Painel do administrador
+│   ├── cursos.html             Catálogo de cursos (criar, editar, desativar)
+│   ├── turmas.html             Turmas: vagas, dias, horário, professor e situação
 │   ├── editais.html            Processos seletivos: criar, configurar e avançar de etapa
 │   └── inscricoes.html         Inscrições de um edital: seleção, convocação e matrícula
 ├── css/
@@ -32,20 +35,25 @@ gestao_pedagogica/
 │   │   └── rotulos.js          Textos de tela para os valores do schema
 │   ├── domain/
 │   │   ├── regras.js           Frequência, risco de evasão, média (funções puras)
+│   │   ├── cadastros.js        Validação de curso e turma (valores de formulário → dados limpos)
 │   │   └── selecao.js          Sorteio auditável, classificação por nota, ordem de inscrição
 │   ├── services/               Acesso a dados por módulo (um arquivo por módulo)
 │   │   ├── alunos.service.js         ← molde dos demais
 │   │   ├── editais.service.js        criar/editar edital, avançar etapa
-│   │   ├── selecao.service.js        executar sorteio/classificação (com registro auditável)
+│   │   ├── selecao.service.js        realizar a seleção do edital (sorteio/classificação, com registro auditável)
 │   │   ├── inscricoes.service.js     convocar, efetivar matrícula (transação), desistência, indeferir
-│   │   ├── cursos.service.js
-│   │   ├── turmas.service.js
+│   │   ├── cursos.service.js         criar/editar/desativar (renomear atualiza as turmas)
+│   │   ├── turmas.service.js         criar/editar com proteção dos números de vagas
+│   │   ├── usuarios.service.js       equipe ativa (professor da turma)
 │   │   └── dashboard.service.js
 │   ├── components/
 │   │   └── shell.js            Menu lateral compartilhado
 │   └── pages/                  Um script por página: liga HTML ↔ services
 │       ├── login.js
+│       ├── inscricao.js          (página pública de inscrição)
 │       ├── dashboard.js
+│       ├── cursos.js
+│       ├── turmas.js
 │       ├── editais.js
 │       └── inscricoes.js
 ├── tools/
@@ -72,8 +80,8 @@ gestao_pedagogica/
 Tudo gira em torno do **edital**, que define como a instituição trabalha:
 
 1. **Edital** (rascunho): título, turmas ofertadas, janela de inscrição, data do resultado, **modalidade** de seleção (sorteio, prova, ordem de inscrição ou análise individual) e **requisitos de matrícula** (documentos, pagamento…).
-2. **Inscrições abertas:** o formulário do site recebe inscrições, só dentro da janela de datas e para as turmas ofertadas.
-3. **Seleção:** com as inscrições encerradas, a equipe executa o sorteio (ou a classificação) por turma. Os escolhidos são **convocados** e reservam vaga; o restante vira lista de remanescentes. O sorteio fica registrado com a semente e pode ser conferido por qualquer pessoa.
+2. **Inscrições abertas:** o formulário público ([`inscricao.html`](inscricao.html)) recebe inscrições, só dentro da janela de datas e para as turmas ofertadas. A tela *Editais* mostra o link de cada edital aberto (`inscricao.html?edital=ID`), que pode ser divulgado ou embutido no site da instituição.
+3. **Seleção:** na tela *Inscrições*, um clique em **Realizar sorteio** (ou *Classificar por nota*, conforme o edital) encerra as inscrições se ainda estiverem abertas, sorteia todas as turmas e, se você deixar marcado, já **publica o resultado e abre as matrículas**. Os escolhidos são **convocados** e reservam vaga, caindo direto na aba *Convocadas*; o restante vira lista de remanescentes. O sorteio fica registrado com a semente e pode ser conferido por qualquer pessoa. Também dá para sortear uma turma por vez.
 4. **Matrículas:** a equipe marca os requisitos cumpridos de cada convocado e efetiva a matrícula. Quem desiste ou perde o prazo libera a vaga, e o próximo remanescente é chamado.
 
 Detalhes e justificativas em [`docs/modelo-de-dados.md`](docs/modelo-de-dados.md).
@@ -114,7 +122,8 @@ Para o login funcionar em `localhost`, o domínio já vem autorizado por padrão
 
 ## Próximos passos sugeridos
 
-1. Telas de **Cursos** e **Turmas** (cadastro simples). Um edital só consegue ofertar turmas que já existem: até lá, crie curso e turma direto no console do Firestore (formato em `docs/modelo-de-dados.md`).
-2. **Diário de classe**: chamada rápida (toque alterna P → F → J) e recálculo do resumo.
-3. **Avaliações**: grade turma × avaliação com lançamento em lote.
-4. Antes de publicar o formulário de inscrição do site: **Firebase App Check**.
+1. **Conectar o Firebase de verdade** (passo a passo em *Configurar*) e testar as `firestore.rules` com os três papéis. O modo desenvolvimento não confere as regras: elas são o maior risco ainda não testado.
+2. **Ativar o Firebase App Check** (reCAPTCHA) antes de divulgar o link do formulário público: as regras limitam o que a página pode gravar, mas não o volume.
+3. **Alunos e matrículas**: ver quem está matriculado em cada turma (hoje só o painel mostra números).
+4. **Diário de classe**: chamada rápida (toque alterna P → F → J) e recálculo do resumo.
+5. **Avaliações**: grade turma × avaliação com lançamento em lote.

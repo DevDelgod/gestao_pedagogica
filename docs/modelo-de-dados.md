@@ -81,7 +81,7 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
 ### Limites conhecidos (para evoluir depois)
 
 - **Portal do aluno:** como a chamada e as notas ficam num mapa por documento, um aluno logado conseguiria ver a turma inteira. Quando criar o portal, ou grave um espelho individual por aluno (`matriculas.{id}` já tem o resumo), ou migre `registros`/`notas` para documentos individuais (`aulas/{id}/presencas/{alunoId}`). Hoje só a equipe acessa, então não é problema.
-- **Spam no formulário público:** as regras limitam campos, tamanhos e janela de datas, mas não impedem volume nem a mesma pessoa se inscrever várias vezes. Ative o **Firebase App Check** (reCAPTCHA) antes de publicar o formulário. Inscrições duplicadas (mesmo e-mail no mesmo edital) ainda não são detectadas: no sorteio, cada inscrição concorre; trate duplicatas com *Indeferir* antes de encerrar as inscrições.
+- **Spam no formulário público** (`inscricao.html`): a página tem um campo-armadilha contra robôs simples, e as regras limitam campos, tamanhos e janela de datas, mas nada impede volume nem a mesma pessoa se inscrever várias vezes. Ative o **Firebase App Check** (reCAPTCHA) antes de publicar o formulário. Inscrições duplicadas (mesmo e-mail no mesmo edital) ainda não são detectadas: no sorteio, cada inscrição concorre; trate duplicatas com *Indeferir* antes de encerrar as inscrições.
 - **Várias instituições no mesmo projeto:** o modelo atual atende **uma instituição por projeto do Firebase**, com o processo configurado por edital. Cada instituição nova pode ter o seu próprio projeto (isolamento total e sem mudanças no código). Hospedar várias no mesmo projeto exigiria um `instituicaoId` em todos os documentos e nas regras — não está feito.
 - **Resultado público:** o site ainda não consegue exibir o resultado do sorteio (as inscrições e os registros só são lidos pela equipe). Quando for preciso, publique uma lista de protocolos/ids por edital numa coleção de leitura pública.
 - **Prazo de matrícula:** vale N dias a partir da convocação (`prazoMatriculaDias`). Um prazo fixo único para todos (comum em editais) não está modelado.
@@ -95,7 +95,7 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
 ```json
 {
   "nome": "Marina Souza",
-  "email": "marina@incubadora.org",
+  "email": "marina@fudev.org",
   "papel": "coordenador",
   "ativo": true,
   "criadoEm": "<Timestamp>"
@@ -136,6 +136,12 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
 ```
 `status`: `planejada` → `aberta` → `em_andamento` → `encerrada` | `cancelada`. Aceitam matrícula `planejada`, `aberta` e `em_andamento` (entrada tardia). Aqui há 14 matriculados + 3 convocados reservando vaga = 17 de 20, restam 3 livres.
 
+**Cadastro de cursos e turmas** (telas *Cursos* e *Turmas*, validação em `js/domain/cadastros.js`):
+
+- Cursos **não são apagados, só desativados**: o histórico (turmas, matrículas) continua fazendo sentido, e o curso inativo some da lista ao criar turmas. Renomear um curso atualiza `cursoNome` nas turmas dele; as cópias em matrículas e editais ficam como estavam.
+- Os contadores da turma (`vagasOcupadas`, `vagasReservadas`) **nunca** são alterados pelo cadastro. Ao editar uma turma o sistema recusa: **vagas totais abaixo do que já está comprometido** (matriculados + convocados); **trocar o curso** se já há matriculados ou convocados; **encerrar ou cancelar** com convocados aguardando matrícula.
+- Renomear uma turma não atualiza a cópia do nome guardada num edital em rascunho: reabra o edital e salve de novo.
+
 ### `alunos/{alunoId}`
 ```json
 {
@@ -149,8 +155,8 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
   "documentos": [
     {
       "nome": "rg-frente.jpg",
-      "url": "https://res.cloudinary.com/<cloud>/image/upload/v1/incubadora/alunos/rg-frente.jpg",
-      "publicId": "incubadora/alunos/rg-frente",
+      "url": "https://res.cloudinary.com/<cloud>/image/upload/v1/fudev/alunos/rg-frente.jpg",
+      "publicId": "fudev/alunos/rg-frente",
       "tipo": "image",
       "bytes": 183422
     }
@@ -315,7 +321,9 @@ O sistema só **sinaliza**: marcar uma matrícula como `evadida` é decisão da 
 
 Todos os que mexem em vagas são **transações** (tudo ou nada) e seguem a mesma forma: o Firestore não permite consulta dentro de transação e exige todas as leituras antes de qualquer escrita; por isso o que precisa de consulta (candidatos, aluno por e-mail, próximo remanescente) é buscado **antes**, e a transação **releia e confirme** cada documento. Os corpos das transações (`...NaTransacao`) são exportados para serem testados com uma `tx` falsa. Cada recusa de regra de negócio é um `ErroDeNegocio` com código próprio, cuja mensagem já serve para mostrar na tela.
 
-**Executar a seleção** — ✅ `js/services/selecao.service.js` (`executarSelecao`), uma turma por vez:
+**Realizar a seleção do edital** — ✅ `realizarSelecao` (`js/services/selecao.service.js`), o que a tela de Inscrições aciona: num só gesto, (1) encerra as inscrições se ainda estiverem abertas, (2) executa a seleção de cada turma pendente, cada uma na sua transação e com registro próprio, e (3) se pedido, publica o resultado e abre as matrículas. Os selecionados já ficam `convocada`, que é onde a matrícula começa. Se uma turma falhar, as outras continuam valendo, a falha volta no resultado e o resultado **não** é publicado; repetir a operação sorteia só as pendentes. Uma única semente vale para todas as turmas do lote (cada registro guarda a sua e é conferido separadamente).
+
+**Executar a seleção de uma turma** — ✅ `executarSelecao` (usada por `realizarSelecao`), uma turma por vez:
 1. exige edital em `selecao`, modalidade automática, turma ofertada e que a seleção da turma ainda não tenha sido feita;
 2. entram só as inscrições que continuam `inscrita`; `ordenarCandidatos` define quem está apto e em que ordem (sorteio com semente, notas, ordem de inscrição);
 3. `distribuirVagas`: os primeiros N (N = vagas livres) viram `convocada` e **reservam vaga**; o resto vira `remanescente` (com `posicaoRemanescente`) ou `nao_selecionada` (se o edital não tem lista de remanescentes, ou por nota ausente/abaixo da mínima);

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cursos · FUDEV</title>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <noscript><style>body[data-auth] { visibility: visible; }</style></noscript>
+  </head>
+  <body data-auth="pending">
+    <div class="app">
+      <aside class="sidebar" id="sidebar"></aside>
+
+      <main class="principal">
+        <header class="topo topo--acao">
+          <div>
+            <h1>Cursos</h1>
+            <p class="topo__sub">O catálogo da instituição. Cada curso pode ter várias turmas.</p>
+          </div>
+          <button class="botao" type="button" id="btn-novo">Novo curso</button>
+        </header>
+
+        <section class="lista" id="lista" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <dialog class="dialogo" id="dlg-curso" aria-labelledby="curso-titulo-dlg">
+      <form id="form-curso" novalidate>
+        <h2 id="curso-titulo-dlg">Novo curso</h2>
+        <p class="dialogo__sub" id="curso-aviso-turmas" hidden></p>
+
+        <p class="aviso" id="curso-erro" role="alert" hidden></p>
+
+        <div class="campo">
+          <label for="cu-nome">Nome</label>
+          <input id="cu-nome" maxlength="120" placeholder="Ex.: Desenvolvimento Web" autocomplete="off" />
+        </div>
+
+        <div class="campo">
+          <label for="cu-descricao">Descrição (opcional)</label>
+          <textarea id="cu-descricao" maxlength="1000"></textarea>
+        </div>
+
+        <div class="grade-2">
+          <div class="campo">
+            <label for="cu-carga">Carga horária (horas)</label>
+            <input id="cu-carga" type="number" min="0" step="1" />
+          </div>
+          <div class="campo">
+            <label for="cu-frequencia">Frequência mínima (%)</label>
+            <input id="cu-frequencia" type="number" min="0" max="100" step="1" />
+          </div>
+          <div class="campo">
+            <label for="cu-media">Média para aprovação (0 a 10)</label>
+            <input id="cu-media" type="number" min="0" max="10" step="0.1" />
+          </div>
+        </div>
+
+        <label class="check"><input id="cu-ativo" type="checkbox" /> Curso ativo (aparece ao criar turmas)</label>
+
+        <div class="dialogo__acoes">
+          <button class="botao botao--fantasma" type="button" data-fechar>Cancelar</button>
+          <button class="botao" type="submit" id="curso-salvar">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="../js/pages/cursos.js"></script>
+  </body>
+</html>

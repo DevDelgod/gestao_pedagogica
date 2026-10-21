@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turmas · FUDEV</title>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <noscript><style>body[data-auth] { visibility: visible; }</style></noscript>
+  </head>
+  <body data-auth="pending">
+    <div class="app">
+      <aside class="sidebar" id="sidebar"></aside>
+
+      <main class="principal">
+        <header class="topo topo--acao">
+          <div>
+            <h1>Turmas</h1>
+            <p class="topo__sub">Cada turma é uma oferta de um curso: vagas, dias de aula, horário e professor.</p>
+          </div>
+          <button class="botao" type="button" id="btn-novo">Nova turma</button>
+        </header>
+
+        <div class="barra">
+          <div class="campo">
+            <label for="f-curso">Curso</label>
+            <select id="f-curso"></select>
+          </div>
+          <div class="campo">
+            <label for="f-status">Situação</label>
+            <select id="f-status"></select>
+          </div>
+        </div>
+
+        <section class="lista" id="lista" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <dialog class="dialogo dialogo--largo" id="dlg-turma" aria-labelledby="turma-titulo-dlg">
+      <form id="form-turma" novalidate>
+        <h2 id="turma-titulo-dlg">Nova turma</h2>
+        <p class="dialogo__sub" id="turma-aviso" hidden></p>
+
+        <p class="aviso" id="turma-erro" role="alert" hidden></p>
+
+        <div class="grade-2">
+          <div class="campo">
+            <label for="tm-curso">Curso</label>
+            <select id="tm-curso"></select>
+          </div>
+          <div class="campo">
+            <label for="tm-nome">Nome da turma</label>
+            <input id="tm-nome" maxlength="120" placeholder="Ex.: Web 2026.1 — Noite" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="grade-2">
+          <div class="campo">
+            <label for="tm-professor">Professor</label>
+            <select id="tm-professor"></select>
+          </div>
+          <div class="campo">
+            <label for="tm-vagas">Total de vagas</label>
+            <input id="tm-vagas" type="number" min="1" max="500" step="1" />
+          </div>
+        </div>
+
+        <fieldset class="campo">
+          <legend>Dias de aula</legend>
+          <div class="opcoes opcoes--linha" id="tm-dias"></div>
+        </fieldset>
+
+        <div class="grade-2">
+          <div class="campo">
+            <label for="tm-hini">Horário de início</label>
+            <input id="tm-hini" type="time" />
+          </div>
+          <div class="campo">
+            <label for="tm-hfim">Horário de fim</label>
+            <input id="tm-hfim" type="time" />
+          </div>
+          <div class="campo">
+            <label for="tm-dini">Início das aulas</label>
+            <input id="tm-dini" type="date" />
+          </div>
+          <div class="campo">
+            <label for="tm-dfim">Fim das aulas</label>
+            <input id="tm-dfim" type="date" />
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="tm-status">Situação</label>
+          <select id="tm-status"></select>
+          <small class="campo__ajuda">Planejada, aberta e em andamento aceitam matrículas. Encerrada e cancelada, não.</small>
+        </div>
+
+        <div class="dialogo__acoes">
+          <button class="botao botao--fantasma" type="button" data-fechar>Cancelar</button>
+          <button class="botao" type="submit" id="turma-salvar">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="../js/pages/turmas.js"></script>
+  </body>
+</html>

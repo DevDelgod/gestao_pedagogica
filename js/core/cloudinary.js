@@ -16,7 +16,7 @@ export async function enviarArquivo(arquivo, pasta = 'geral') {
   const corpo = new FormData();
   corpo.append('file', arquivo);
   corpo.append('upload_preset', cloudinary.uploadPreset);
-  corpo.append('folder', `incubadora/${pasta}`);
+  corpo.append('folder', `fudev/${pasta}`);
 
   const resposta = await fetch(
     `https://api.cloudinary.com/v1_1/${cloudinary.cloudName}/auto/upload`,

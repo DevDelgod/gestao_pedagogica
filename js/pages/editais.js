@@ -85,6 +85,7 @@ function editalHtml(e) {
       </div>
       <div class="item__acoes">
         ${e.status === STATUS_EDITAL.RASCUNHO ? '<button class="botao botao--fantasma" type="button" data-acao="editar">Editar</button>' : ''}
+        ${e.status === STATUS_EDITAL.INSCRICOES ? `<a class="botao botao--fantasma" href="../inscricao.html?edital=${encodeURIComponent(e.id)}" target="_blank" rel="noopener">Formulário público</a>` : ''}
         ${e.status !== STATUS_EDITAL.RASCUNHO ? `<a class="botao botao--fantasma" href="inscricoes.html?edital=${encodeURIComponent(e.id)}">Ver inscrições</a>` : ''}
         ${proximo ? `<button class="botao" type="button" data-acao="avancar">${proximo}</button>` : ''}
       </div>

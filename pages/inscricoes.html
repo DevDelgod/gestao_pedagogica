@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Inscrições · Incubadora</title>
+    <title>Inscrições · FUDEV</title>
     <link rel="stylesheet" href="../css/tokens.css" />
     <link rel="stylesheet" href="../css/base.css" />
     <link rel="stylesheet" href="../css/components.css" />
@@ -30,7 +30,10 @@
           </div>
         </div>
 
-        <!-- vagas da turma + ações de seleção -->
+        <!-- etapa do edital + ação principal (sorteio de todas as turmas / publicar resultado) -->
+        <section class="cartao painel-turma painel-edital" id="painel-edital" hidden></section>
+
+        <!-- vagas da turma escolhida + ações dela -->
         <section class="cartao painel-turma" id="painel-turma" hidden></section>
 
         <div class="abas" role="tablist" id="abas" aria-label="Situação da inscrição"></div>
@@ -60,19 +63,34 @@
       <form id="form-selecao" novalidate>
         <h2 id="selecao-titulo"></h2>
         <p class="dialogo__sub" id="selecao-resumo"></p>
+        <ul class="checklist" id="selecao-turmas"></ul>
         <p class="aviso aviso--info" id="selecao-info"></p>
+        <p class="aviso" id="selecao-encerra" hidden></p>
         <p class="aviso" id="selecao-erro" role="alert" hidden></p>
         <div class="campo" id="selecao-campo-semente">
           <label for="selecao-semente">Semente do sorteio (opcional)</label>
           <input id="selecao-semente" maxlength="120" autocomplete="off" />
           <small class="campo__ajuda">Em branco, o sistema gera uma. Se o edital usa um dado público (por exemplo, números da Loteria Federal), digite-o aqui: qualquer pessoa poderá refazer o sorteio e conferir.</small>
         </div>
-        <p class="item__meta"><strong>Esta ação não pode ser desfeita</strong> e só pode ser executada uma vez por turma.</p>
+        <label class="check" id="selecao-publicar-linha">
+          <input id="selecao-publicar" type="checkbox" checked />
+          Publicar o resultado e abrir as matrículas ao terminar
+        </label>
+        <p class="item__meta"><strong>Esta ação não pode ser desfeita</strong> e só pode ser executada uma vez por turma. Os selecionados ficam convocados e passam para a matrícula.</p>
         <div class="dialogo__acoes">
           <button class="botao botao--fantasma" type="button" data-fechar>Cancelar</button>
           <button class="botao" type="submit" id="selecao-confirmar">Executar</button>
         </div>
       </form>
+    </dialog>
+
+    <!-- Resultado logo após a seleção: encaminha para as matrículas -->
+    <dialog class="dialogo dialogo--largo" id="dlg-resultado" aria-labelledby="resultado-titulo">
+      <h2 id="resultado-titulo">Seleção realizada</h2>
+      <div id="resultado-corpo"></div>
+      <div class="dialogo__acoes">
+        <button class="botao" type="button" data-fechar id="resultado-continuar">Ir para as matrículas</button>
+      </div>
     </dialog>
 
     <!-- Registro auditável da seleção -->

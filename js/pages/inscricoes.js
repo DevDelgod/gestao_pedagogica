@@ -1,12 +1,12 @@
 import { exigirLogin } from '../core/auth.js';
 import { montarShell } from '../components/shell.js';
-import { $, $$, escapar, toast } from '../core/ui.js';
+import { $, $$, confirmar, escapar, toast } from '../core/ui.js';
 import { formatarData, formatarDataHora, hojeISO } from '../core/datas.js';
 import { ErroDeNegocio } from '../core/erros.js';
 import { MODALIDADE_SELECAO as M, PAPEIS, STATUS_EDITAL as E, STATUS_INSCRICAO as S } from '../models/schema.js';
 import { ROTULO_MODALIDADE, ROTULO_STATUS_INSCRICAO } from '../models/rotulos.js';
 import { temSelecaoAutomatica, verificarSorteio } from '../domain/selecao.js';
-import { editaisRepo, listarEditais } from '../services/editais.service.js';
+import { avancarEtapa, editaisRepo, listarEditais } from '../services/editais.service.js';
 import {
   convocarInscricao,
   convocarProximoRemanescente,
@@ -17,7 +17,7 @@ import {
   marcarRequisito,
   registrarNota,
 } from '../services/inscricoes.service.js';
-import { executarSelecao, obterSelecao } from '../services/selecao.service.js';
+import { obterSelecao, realizarSelecao } from '../services/selecao.service.js';
 import { turmasRepo, vagasLivres } from '../services/turmas.service.js';
 
 // Convocar, matricular e liberar vagas mexem em contadores: só gestão (as regras do Firestore também exigem).
@@ -32,8 +32,9 @@ const ABAS = [
   { id: 'encerrada', rotulo: 'Encerradas', status: [S.NAO_SELECIONADA, S.INDEFERIDA, S.DESISTENTE], vazio: 'Nada por aqui.' },
 ];
 
+/** Texto do botão que realiza a seleção, por modalidade. */
 const ROTULO_EXECUTAR = {
-  [M.SORTEIO]: 'Executar sorteio',
+  [M.SORTEIO]: 'Realizar sorteio',
   [M.PROVA]: 'Classificar por nota',
   [M.ORDEM_CHEGADA]: 'Aplicar ordem de inscrição',
 };
@@ -155,6 +156,7 @@ const contar = (aba) => visiveis().filter((i) => aba.status.includes(i.status)).
 
 function renderizar() {
   $('#sub').textContent = `${ROTULO_MODALIDADE[estado.edital.modalidade]} · ${estado.itens.length} inscrição(ões) no edital`;
+  renderizarPainelEdital();
   renderizarPainel();
   renderizarAbas();
   renderizarLista();
@@ -168,21 +170,72 @@ function renderizarAbas() {
   }).join('');
 }
 
+/** Turmas do edital que ainda não tiveram a seleção realizada. */
+const turmasSemSelecao = () => estado.edital.turmaIds.filter((id) => !estado.registros.get(id));
+
+/**
+ * Painel do edital: a etapa em que ele está e a ação principal do momento.
+ * Para edital de sorteio (ou outra seleção automática) o botão realiza a seleção de TODAS as turmas
+ * pendentes de uma vez e encaminha os selecionados para a matrícula.
+ */
+function renderizarPainelEdital() {
+  const painel = $('#painel-edital');
+  const ed = estado.edital;
+  const linhas = [];
+  const botoes = [];
+
+  if (somenteConsulta()) {
+    linhas.push('Edital encerrado: esta tela está somente para consulta.');
+  } else if (temSelecaoAutomatica(ed.modalidade)) {
+    const pendentes = turmasSemSelecao();
+    const total = ed.turmaIds.length;
+    const rotulo = ROTULO_EXECUTAR[ed.modalidade];
+
+    if ([E.INSCRICOES, E.SELECAO].includes(ed.status) && pendentes.length) {
+      linhas.push(`<strong>${total - pendentes.length} de ${total}</strong> turma(s) com a seleção realizada.`);
+      if (ed.status === E.INSCRICOES) linhas.push('As inscrições ainda estão abertas: ao realizar a seleção elas serão encerradas.');
+      botoes.push(`<button class="botao" type="button" data-acao="selecionar-todas">${pendentes.length < total ? `${rotulo} (turmas restantes)` : rotulo}</button>`);
+    } else if (ed.status === E.SELECAO) {
+      linhas.push('Seleção realizada em todas as turmas. Publique o resultado para abrir as matrículas.');
+      botoes.push('<button class="botao" type="button" data-acao="publicar">Publicar resultado e abrir matrículas</button>');
+    } else if (ed.status === E.MATRICULAS) {
+      linhas.push('Matrículas abertas: na aba <strong>Convocadas</strong>, marque os requisitos de cada pessoa e efetive a matrícula.');
+    }
+  }
+
+  painel.hidden = !linhas.length;
+  painel.innerHTML = `${linhas.map((l) => `<p class="item__meta">${l}</p>`).join('')}${botoes.length ? `<div class="item__acoes">${botoes.join('')}</div>` : ''}`;
+}
+
+$('#painel-edital').addEventListener('click', async (evento) => {
+  const botao = evento.target.closest('button[data-acao]');
+  if (!botao) return;
+  if (botao.dataset.acao === 'selecionar-todas') return abrirSelecao(turmasSemSelecao());
+  if (botao.dataset.acao === 'publicar') {
+    const ok = await confirmar({
+      titulo: 'Publicar resultado e abrir matrículas',
+      mensagem: 'O resultado passa a valer e os convocados poderão se matricular.',
+      rotulo: 'Publicar resultado',
+    });
+    if (!ok) return;
+    await executar(async () => {
+      await avancarEtapa(estado.edital.id);
+      toast('Resultado publicado. As matrículas estão abertas.', 'sucesso');
+      estado.aba = 'convocada';
+    }, botao);
+  }
+});
+
+/** Painel da turma escolhida: vagas e as ações dela. */
 function renderizarPainel() {
   const painel = $('#painel-turma');
   const ed = estado.edital;
   const automatica = temSelecaoAutomatica(ed.modalidade);
-
   const avisos = [];
-  if (ed.status === E.INSCRICOES) {
-    avisos.push('As inscrições ainda estão abertas. Para executar a seleção, encerre-as na página <a href="editais.html">Editais</a>.');
-  }
-  if (somenteConsulta()) avisos.push('Edital encerrado: esta tela está somente para consulta.');
 
   if (!estado.turmaId) {
-    if (automatica && ed.status === E.SELECAO) avisos.push('Escolha uma turma para executar a seleção.');
-    painel.hidden = !avisos.length;
-    painel.innerHTML = avisos.map((a) => `<p class="item__meta">${a}</p>`).join('');
+    painel.hidden = true;
+    painel.innerHTML = '';
     return;
   }
 
@@ -199,8 +252,8 @@ function renderizarPainel() {
   const semNota = daTurma.filter((i) => i.status === S.INSCRITA && typeof i.nota !== 'number').length;
 
   const botoes = [];
-  if (automatica && ed.status === E.SELECAO && !registro) {
-    botoes.push(`<button class="botao" type="button" data-acao="selecionar">${ROTULO_EXECUTAR[ed.modalidade]}</button>`);
+  if (automatica && [E.INSCRICOES, E.SELECAO].includes(ed.status) && !registro) {
+    botoes.push(`<button class="botao botao--fantasma" type="button" data-acao="selecionar">${ROTULO_EXECUTAR[ed.modalidade]} só desta turma</button>`);
   }
   if (registro) {
     botoes.push('<button class="botao botao--fantasma" type="button" data-acao="registro">Ver registro da seleção</button>');
@@ -408,7 +461,7 @@ $('#painel-turma').addEventListener('click', (evento) => {
   const botao = evento.target.closest('button[data-acao]');
   if (!botao) return;
 
-  if (botao.dataset.acao === 'selecionar') return abrirSelecao();
+  if (botao.dataset.acao === 'selecionar') return abrirSelecao([estado.turmaId]);
   if (botao.dataset.acao === 'registro') return abrirRegistro(estado.turmaId);
   if (botao.dataset.acao === 'proximo-remanescente') {
     return executar(async () => {
@@ -469,28 +522,44 @@ $('#form-motivo').addEventListener('submit', async (evento) => {
 // --- executar seleção ---
 const dlgSelecao = $('#dlg-selecao');
 
-function abrirSelecao() {
-  const ed = estado.edital;
-  const turma = estado.turmas.get(estado.turmaId);
-  const candidatos = estado.itens.filter((i) => i.turmaId === estado.turmaId && i.status === S.INSCRITA);
-  const livres = Math.max(0, vagasLivres(turma));
-  const lista = ed.config.listaRemanescentes
-    ? 'As demais formarão a lista de remanescentes, na ordem do resultado.'
-    : 'As demais ficarão como não selecionadas.';
+/** Turmas do lote que será selecionado agora (uma turma, ou todas as pendentes). */
+let lote = [];
 
-  const descricao = {
-    [M.SORTEIO]: `${candidatos.length} inscrição(ões) concorrem a ${livres} vaga(s). ${lista}`,
-    [M.ORDEM_CHEGADA]: `${candidatos.length} inscrição(ões) para ${livres} vaga(s). As primeiras a se inscrever serão convocadas. ${lista}`,
-    [M.PROVA]: `${candidatos.length} inscrição(ões) para ${livres} vaga(s), por maior nota (mínima: ${ed.config.notaMinima}). ${
-      candidatos.filter((c) => typeof c.nota !== 'number').length
-    } sem nota ficarão de fora. ${lista}`,
+function abrirSelecao(turmaIds) {
+  const ed = estado.edital;
+  lote = turmaIds;
+  const pendentes = turmasSemSelecao();
+  const lista = ed.config.listaRemanescentes
+    ? 'Quem não ficar nas vagas formará a lista de remanescentes, na ordem do resultado.'
+    : 'Quem não ficar nas vagas será marcado como não selecionado.';
+
+  const candidatosDe = (turmaId) => estado.itens.filter((i) => i.turmaId === turmaId && i.status === S.INSCRITA);
+  const linhas = turmaIds.map((turmaId) => {
+    const turma = estado.turmas.get(turmaId);
+    const candidatos = candidatosDe(turmaId);
+    const semNota = ed.modalidade === M.PROVA ? candidatos.filter((c) => typeof c.nota !== 'number').length : 0;
+    const livres = Math.max(0, turma ? vagasLivres(turma) : 0);
+    return `<li><strong>${escapar(nomeTurma(turmaId))}</strong>: ${candidatos.length} inscrição(ões) para ${livres} vaga(s)${semNota ? ` · <em>${semNota} sem nota ficarão de fora</em>` : ''}</li>`;
+  });
+
+  const explicacao = {
+    [M.SORTEIO]: `O sorteio é feito entre os inscritos de cada turma. ${lista}`,
+    [M.ORDEM_CHEGADA]: `As primeiras pessoas a se inscrever em cada turma são convocadas. ${lista}`,
+    [M.PROVA]: `As vagas vão para as maiores notas (mínima: ${ed.config.notaMinima}). ${lista}`,
   }[ed.modalidade];
 
-  $('#selecao-titulo').textContent = `${ROTULO_EXECUTAR[ed.modalidade]} — ${turma.nome}`;
-  $('#selecao-resumo').textContent = ed.titulo;
-  $('#selecao-info').textContent = descricao;
+  const todasAsPendentes = pendentes.every((id) => turmaIds.includes(id));
+  const titulo = turmaIds.length === 1 ? nomeTurma(turmaIds[0]) : ed.titulo;
+  $('#selecao-titulo').textContent = `${ROTULO_EXECUTAR[ed.modalidade]} — ${titulo}`;
+  $('#selecao-resumo').textContent = turmaIds.length === 1 ? ed.titulo : `${turmaIds.length} turma(s) neste edital`;
+  $('#selecao-turmas').innerHTML = linhas.join('');
+  $('#selecao-info').textContent = explicacao;
+  mostrar($('#selecao-encerra'), ed.status === E.INSCRICOES ? 'As inscrições ainda estão abertas e serão encerradas agora.' : '');
   $('#selecao-campo-semente').hidden = ed.modalidade !== M.SORTEIO;
   $('#selecao-semente').value = '';
+  // só dá para publicar o resultado quando, depois deste lote, todas as turmas do edital estiverem sorteadas
+  $('#selecao-publicar-linha').hidden = !todasAsPendentes;
+  $('#selecao-publicar').checked = true;
   $('#selecao-confirmar').textContent = ROTULO_EXECUTAR[ed.modalidade];
   $('#selecao-confirmar').disabled = false;
   mostrar($('#selecao-erro'), '');
@@ -502,21 +571,63 @@ $('#form-selecao').addEventListener('submit', async (evento) => {
   const botao = $('#selecao-confirmar');
   botao.disabled = true;
   mostrar($('#selecao-erro'), '');
-  const turmaId = estado.turmaId;
   try {
-    const r = await executarSelecao({ editalId: estado.edital.id, turmaId, semente: $('#selecao-semente').value });
+    const resumo = await realizarSelecao({
+      editalId: estado.edital.id,
+      turmaIds: lote,
+      semente: $('#selecao-semente').value,
+      publicarResultado: !$('#selecao-publicar-linha').hidden && $('#selecao-publicar').checked,
+    });
     dlgSelecao.close();
-    toast(`Seleção concluída: ${r.convocados} convocado(s), ${r.remanescentes} remanescente(s), ${r.naoSelecionados} não selecionado(s).`, 'sucesso');
     await recarregar().then(renderizar, () => {});
-    abrirRegistro(turmaId); // mostra a semente e o resultado logo após a execução
+    abrirResultado(resumo);
   } catch (erro) {
     if (erro instanceof ErroDeNegocio) mostrar($('#selecao-erro'), erro.message);
     else {
       console.error(erro);
-      mostrar($('#selecao-erro'), 'Não foi possível executar agora. Verifique a conexão e tente de novo.');
+      mostrar($('#selecao-erro'), 'Não foi possível realizar agora. Verifique a conexão e tente de novo. Se algo já foi sorteado, atualize a página para ver.');
+      recarregar().then(renderizar, () => {});
     }
     botao.disabled = false;
   }
+});
+
+// --- resultado: logo após a seleção, encaminha para as matrículas ---
+function abrirResultado({ resultados, falhas, publicado, erroPublicacao, semente }) {
+  // os selecionados já estão "convocados": a aba Convocadas é a parte da matrícula
+  estado.aba = resultados.some((r) => r.convocados > 0) ? 'convocada' : estado.aba;
+  renderizarAbas();
+  renderizarLista();
+
+  const total = (campo) => resultados.reduce((soma, r) => soma + r[campo], 0);
+  const linhas = resultados
+    .map(
+      (r) => `<li><strong>${escapar(r.turmaNome)}</strong>: ${r.convocados} convocado(s) · ${r.remanescentes} remanescente(s) · ${r.naoSelecionados} não selecionado(s)
+        <button class="link-botao" type="button" data-registro="${escapar(r.turmaId)}">ver registro</button></li>`,
+    )
+    .join('');
+  const erros = falhas.map((f) => `<p class="aviso" role="alert"><strong>${escapar(f.turmaNome)}:</strong> ${escapar(f.mensagem)}</p>`).join('');
+
+  const situacao = publicado
+    ? '<p class="aviso aviso--info">Resultado publicado: o edital está na etapa de <strong>Matrículas</strong>.</p>'
+    : erroPublicacao
+      ? `<p class="aviso" role="alert">O resultado não foi publicado: ${escapar(erroPublicacao)}</p>`
+      : '<p class="item__meta">O resultado ainda não foi publicado. Quando quiser, use <strong>Publicar resultado</strong> no topo desta tela.</p>';
+
+  $('#resultado-titulo').textContent = falhas.length ? 'Seleção realizada, com avisos' : 'Seleção realizada';
+  $('#resultado-corpo').innerHTML = `
+    <p><strong>${total('convocados')} pessoa(s) convocada(s)</strong> já estão na aba <strong>Convocadas</strong>, aguardando a matrícula.</p>
+    <ul class="checklist">${linhas}</ul>
+    ${semente ? `<p class="item__meta">Semente do sorteio: <code>${escapar(semente)}</code> (fica no registro de cada turma).</p>` : ''}
+    ${erros}
+    ${situacao}`;
+  $('#resultado-continuar').textContent = total('convocados') ? 'Ir para as matrículas' : 'Fechar';
+  $('#dlg-resultado').showModal();
+}
+
+$('#resultado-corpo').addEventListener('click', (evento) => {
+  const botao = evento.target.closest('[data-registro]');
+  if (botao) abrirRegistro(botao.dataset.registro);
 });
 
 // --- registro auditável ---

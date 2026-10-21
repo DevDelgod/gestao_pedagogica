@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inscrição · FUDEV</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <!-- Página PÚBLICA (sem login): lista os editais com inscrições abertas e envia a inscrição.
+         Use ?edital=ID para abrir já num edital (é o link que a tela de Editais oferece). -->
+    <main class="login">
+      <section class="cartao login__caixa publico__caixa">
+        <h1 class="login__titulo">Inscrição</h1>
+        <p class="login__sub" id="sub">Carregando…</p>
+
+        <div id="mensagem-geral" hidden></div>
+
+        <form id="form-inscricao" novalidate hidden>
+          <div class="campo" id="campo-edital" hidden>
+            <label for="in-edital">Edital</label>
+            <select id="in-edital"></select>
+          </div>
+
+          <div class="edital-info" id="info-edital"></div>
+
+          <div class="campo">
+            <label for="in-turma">Turma</label>
+            <select id="in-turma"></select>
+          </div>
+          <div class="campo">
+            <label for="in-nome">Nome completo</label>
+            <input id="in-nome" maxlength="120" autocomplete="name" />
+          </div>
+          <div class="campo">
+            <label for="in-email">E-mail</label>
+            <input id="in-email" type="email" maxlength="120" autocomplete="email" />
+          </div>
+          <div class="campo">
+            <label for="in-telefone">Telefone ou WhatsApp (opcional)</label>
+            <input id="in-telefone" type="tel" maxlength="30" autocomplete="tel" />
+          </div>
+          <div class="campo">
+            <label for="in-mensagem">Mensagem (opcional)</label>
+            <textarea id="in-mensagem" maxlength="1000"></textarea>
+          </div>
+
+          <!-- armadilha para robôs: pessoas não veem nem preenchem -->
+          <div class="armadilha" aria-hidden="true">
+            <label>Deixe em branco <input id="in-site" tabindex="-1" autocomplete="off" /></label>
+          </div>
+
+          <p class="aviso" id="erro" role="alert" hidden></p>
+          <button class="botao botao--bloco" id="btn-enviar" type="submit">Enviar inscrição</button>
+          <p class="login__rodape">Seus dados serão usados apenas para o processo seletivo.</p>
+        </form>
+
+        <div id="sucesso" hidden></div>
+      </section>
+    </main>
+
+    <script type="module" src="js/pages/inscricao.js"></script>
+  </body>
+</html>

@@ -538,6 +538,12 @@ fieldset.campo legend {
   gap: var(--espaco-2);
 }
 
+.opcoes--linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2) var(--espaco-4);
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -655,6 +661,48 @@ fieldset.campo legend {
   margin: var(--espaco-4) 0 0;
   text-align: center;
   font-size: 0.9rem;
+}
+
+/* ---------- página pública de inscrição ---------- */
+.publico__caixa {
+  width: min(100%, 640px);
+}
+
+.edital-info {
+  margin-bottom: var(--espaco-4);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie-2);
+}
+
+.edital-info h2 {
+  margin-bottom: var(--espaco-1);
+  font-size: 1.05rem;
+}
+
+.edital-info p {
+  margin: var(--espaco-1) 0 0;
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+}
+
+#sucesso {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+#sucesso p {
+  margin: 0;
+}
+
+/* campo-armadilha contra robôs: fora da tela, mas presente no HTML (display:none seria ignorado por eles) */
+.armadilha {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {

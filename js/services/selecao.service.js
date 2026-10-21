@@ -19,6 +19,7 @@ import {
   ordenarCandidatos,
   temSelecaoAutomatica,
 } from '../domain/selecao.js';
+import { avancarEtapa, editaisRepo } from './editais.service.js';
 import { camposDeConvocacao, inscricoesRepo } from './inscricoes.service.js';
 import { vagasLivres } from './turmas.service.js';
 
@@ -37,6 +38,74 @@ const MOTIVO_SEM_VAGA = 'Fora do número de vagas.';
 export const obterSelecao = (editalId, turmaId) => selecoesRepo.obter(idSelecao(editalId, turmaId));
 
 /**
+ * Realiza a seleção do edital num só gesto — é o que a equipe aciona na tela de Inscrições:
+ *   1. se as inscrições ainda estão abertas, encerra-as (o edital passa para "Em seleção");
+ *   2. executa a seleção de cada turma pendente (cada uma na sua transação, com registro próprio);
+ *   3. se `publicarResultado`, publica o resultado e abre as matrículas.
+ * Os selecionados já ficam "convocados": é a partir daí que a matrícula acontece.
+ *
+ * Falhas de uma turma não impedem as outras: voltam em `falhas` (as turmas já sorteadas continuam
+ * valendo e a operação pode ser repetida só para as pendentes). O resultado só é publicado se
+ * nenhuma turma falhou. Falhas técnicas (rede etc.) são lançadas.
+ *
+ * @param {{ editalId: string, turmaIds?: string[], semente?: string, publicarResultado?: boolean }} opcoes
+ *   turmaIds: omitido = todas as turmas ainda sem seleção. semente: vale para todas as turmas do lote.
+ * @returns {Promise<{ resultados: Array<{ turmaId: string, turmaNome: string, convocados: number, remanescentes: number, naoSelecionados: number, semente: string|null }>,
+ *   falhas: Array<{ turmaId: string, turmaNome: string, mensagem: string }>, publicado: boolean, erroPublicacao: string|null, semente: string|null }>}
+ */
+export async function realizarSelecao({ editalId, turmaIds, semente, publicarResultado = false }) {
+  const edital = await editaisRepo.obter(editalId);
+  if (!edital) throw new ErroDeNegocio('nao-encontrado', 'Edital não encontrado.');
+  if (!temSelecaoAutomatica(edital.modalidade)) {
+    throw new ErroDeNegocio('modalidade-manual', 'Este edital é de análise individual: convoque as inscrições uma a uma.');
+  }
+  if (![STATUS_EDITAL.INSCRICOES, STATUS_EDITAL.SELECAO].includes(edital.status)) {
+    throw new ErroDeNegocio('edital-fora-da-etapa', 'A seleção só pode ser realizada com as inscrições abertas ou encerradas, antes da etapa de matrículas.');
+  }
+
+  const registros = await Promise.all(edital.turmaIds.map((id) => obterSelecao(editalId, id)));
+  const pendentes = edital.turmaIds.filter((_, i) => !registros[i]);
+  const alvo = (turmaIds ?? pendentes).filter((id) => pendentes.includes(id));
+  if (!alvo.length) throw new ErroDeNegocio('selecao-ja-executada', 'A seleção já foi realizada em todas as turmas escolhidas.');
+
+  if (edital.status === STATUS_EDITAL.INSCRICOES) await avancarEtapa(editalId); // encerra as inscrições
+
+  const sementeComum = semente?.trim() || gerarSemente();
+  const resultados = [];
+  const falhas = [];
+  for (const turmaId of alvo) {
+    const turmaNome = edital.turmas.find((t) => t.id === turmaId)?.nome ?? turmaId;
+    try {
+      resultados.push({ turmaId, turmaNome, ...(await executarSelecao({ editalId, turmaId, semente: sementeComum })) });
+    } catch (erro) {
+      if (!(erro instanceof ErroDeNegocio)) throw erro;
+      falhas.push({ turmaId, turmaNome, mensagem: erro.message });
+    }
+  }
+
+  let publicado = false;
+  let erroPublicacao = null;
+  if (publicarResultado && !falhas.length) {
+    try {
+      await avancarEtapa(editalId); // só passa se TODAS as turmas do edital já têm a seleção feita
+      publicado = true;
+    } catch (erro) {
+      if (!(erro instanceof ErroDeNegocio)) throw erro;
+      erroPublicacao = erro.message;
+    }
+  }
+
+  return {
+    resultados,
+    falhas,
+    publicado,
+    erroPublicacao,
+    semente: edital.modalidade === MODALIDADE_SELECAO.SORTEIO ? sementeComum : null,
+  };
+}
+
+/**
+ * Seleção de UMA turma (a função de baixo nível usada por realizarSelecao).
  * @param {{ editalId: string, turmaId: string, semente?: string }} opcoes
  *   semente: só vale para sorteio. Em branco, o sistema gera uma. Pode ser um dado público
  *   (ex.: números de uma extração da Loteria Federal) para dar transparência ao sorteio.

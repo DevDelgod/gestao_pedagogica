@@ -40,6 +40,25 @@ export const ROTULO_STATUS_INSCRICAO = Object.freeze({
   desistente: 'Desistente',
 });
 
+export const ROTULO_STATUS_TURMA = Object.freeze({
+  planejada: 'Planejada',
+  aberta: 'Aberta',
+  em_andamento: 'Em andamento',
+  encerrada: 'Encerrada',
+  cancelada: 'Cancelada',
+});
+
+/** Mesma ordem de DIAS_SEMANA (domingo = 0). */
+export const ROTULO_DIA = Object.freeze({
+  dom: 'Domingo',
+  seg: 'Segunda',
+  ter: 'Terça',
+  qua: 'Quarta',
+  qui: 'Quinta',
+  sex: 'Sexta',
+  sab: 'Sábado',
+});
+
 export const ROTULO_TIPO_REQUISITO = Object.freeze({
   documento: 'Documento',
   pagamento: 'Pagamento',

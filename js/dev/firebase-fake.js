@@ -16,8 +16,8 @@ import { CONTAS_DEV, SEED_VERSAO, semear } from './seed.js';
 // ---------------------------------------------------------------------------
 // Armazenamento
 // ---------------------------------------------------------------------------
-const CHAVE_DADOS = 'incubadora:dev:dados';
-const CHAVE_SESSAO = 'incubadora:dev:sessao';
+const CHAVE_DADOS = 'fudev:dev:dados';
+const CHAVE_SESSAO = 'fudev:dev:sessao';
 
 export class Timestamp {
   constructor(ms) { this.ms = ms; }

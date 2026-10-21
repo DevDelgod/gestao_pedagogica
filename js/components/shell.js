@@ -14,11 +14,11 @@ const GESTAO = [PAPEIS.ADMIN, PAPEIS.COORDENADOR];
 
 const MENU = [
   { id: 'dashboard', rotulo: 'Painel', pronto: true },
+  { id: 'cursos', rotulo: 'Cursos', pronto: true, papeis: GESTAO },
+  { id: 'turmas', rotulo: 'Turmas', pronto: true, papeis: GESTAO },
   { id: 'editais', rotulo: 'Editais', pronto: true, papeis: GESTAO },
   { id: 'inscricoes', rotulo: 'Inscrições', pronto: true, papeis: GESTAO },
   { id: 'alunos', rotulo: 'Alunos', pronto: false },
-  { id: 'cursos', rotulo: 'Cursos', pronto: false },
-  { id: 'turmas', rotulo: 'Turmas', pronto: false },
   { id: 'diario', rotulo: 'Diário de classe', pronto: false },
   { id: 'avaliacoes', rotulo: 'Avaliações', pronto: false },
 ];
@@ -37,7 +37,7 @@ export function montarShell({ ativo, perfil }) {
     .join('');
 
   document.getElementById('sidebar').innerHTML = `
-    <div class="marca">Incubadora</div>
+    <div class="marca">FUDEV</div>
     <nav class="nav" aria-label="Principal">${itens}</nav>
     <div class="usuario">
       <div class="usuario__nome">${escapar(perfil.nome || perfil.email)}</div>
