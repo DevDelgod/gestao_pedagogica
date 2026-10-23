@@ -23,7 +23,7 @@ gestao_pedagogica/
 │   ├── cursos.html             Catálogo de cursos (criar, editar, desativar)
 │   ├── turmas.html             Turmas: vagas, dias, horário, professor e situação
 │   ├── alunos.html             Alunos: ficha (cadastro, dados do sistema oficial, matrículas, documentos), busca e filtros
-│   ├── diario.html             Diário de classe: chamada rápida (P/F/J) e conteúdo da aula; usado pelo professor
+│   ├── diario.html             Diário de classe: chamada rápida (P/F/J), faltas de cada pessoa, justificativas e e-mails a cada 3 faltas; usado pelo professor
 │   ├── avaliacoes.html         Avaliações da turma: criar (escolhendo nota ou Apto / Não apto em cada uma) e lançar os resultados; usado pelo professor
 │   ├── editais.html            (fora do menu) Processos seletivos: criar, configurar e avançar de etapa
 │   └── inscricoes.html         (fora do menu) Inscrições de um edital: seleção, convocação e matrícula
@@ -54,6 +54,7 @@ gestao_pedagogica/
 │   │   ├── avaliacoes.js       Avaliações (nota ou Apto / Não apto, por avaliação): validação dos resultados, recálculo de média e aptidão
 │   │   ├── matricula.js        Ciclo da matrícula: transições permitidas, efeito nas vagas, situação do aluno
 │   │   ├── diario.js           Chamada: validação, quem entra na lista, recálculo da frequência e do risco
+│   │   ├── faltas.js           A cada 3 faltas não justificadas, e-mail: quem precisa receber, avisos já enviados, justificativas
 │   │   ├── pessoa.js           Nome social como nome de exibição; gênero com "Outro" (texto livre)
 │   │   └── selecao.js          Sorteio auditável, classificação por nota, ordem de inscrição
 │   ├── services/               Acesso a dados por módulo (um arquivo por módulo)
@@ -62,6 +63,7 @@ gestao_pedagogica/
 │   │   ├── diario.service.js         registrar/corrigir/excluir aula e recalcular a frequência (uma transação)
 │   │   ├── importacao.service.js     ler a planilha, montar o plano e gravar em lotes (reimportar não duplica); histórico
 │   │   ├── analises.service.js       carrega a base inteira (pessoas, matrículas, turmas, cursos, aulas) para as análises
+│   │   ├── faltas.service.js         quem precisa de e-mail de falta e o registro dos já enviados
 │   │   ├── avaliacoes.service.js     criar/editar/excluir avaliação e lançar resultados, recalculando média ou aptidão (uma transação)
 │   │   ├── editais.service.js        criar/editar edital, avançar etapa
 │   │   ├── selecao.service.js        realizar a seleção do edital (sorteio/classificação, com registro auditável)
@@ -106,17 +108,23 @@ gestao_pedagogica/
 3. `js/services/turmas.service.js` — `export const turmasRepo = criarRepo(COLECOES.TURMAS);` + consultas e funções de negócio.
 4. Em `js/components/shell.js`, troque `pronto: false` por `true` no item do menu.
 
+## Faltas, justificativas e e-mail a cada 3 faltas
+
+No **Diário de classe**, cada pessoa mostra a quantidade de **faltas** (e de justificadas) e, em **Ver faltas**, cada falta com a data e o botão **Justificar**: você escreve o motivo (opcional) e a falta deixa de contar. Na própria chamada, marcar **J** abre um campo para o motivo. **Falta justificada não conta** para a frequência de risco nem para o e-mail.
+
+No alto da página, **E-mails de falta a enviar** lista quem está **exatamente em 3, 6, 9… faltas** e ainda não foi avisado (de 3 em 3: quem tem 4 ou 5 faltas não aparece), com o total de faltas, o contato e o botão **Escrever e-mail** (abre o seu programa de e-mail com um rascunho para você editar). O sistema **não envia** e-mail sozinho: depois de enviar, clique em **Marquei como enviado** (só a coordenação) e a pessoa sai da lista até a próxima marca de 3 faltas. **O passado já está tratado:** o que a equipe mandava antes do sistema existir não volta como pendente; só entram na lista as marcas em que a pessoa está agora e as que ela alcançar daqui para a frente (inclusive quando pula uma marca, de 2 para 4 faltas numa semana). O botão **Já enviei todos até agora** marca como enviado tudo o que está na lista. O Painel mostra quantas pessoas aguardam e-mail.
+
 ## Como os dados chegam do sistema oficial
 
-O sistema oficial exporta planilhas do Excel; o FUDEV as lê (tela **Importar dados**) e monta o resto. Há dois tipos:
+O sistema oficial exporta planilhas do Excel; o FUDEV as lê (tela **Importar dados**, um campo para cada tipo) e monta o resto. A ligação entre as duas é o **número de inscrição** (ex.: `QM05075`): ele está na linha de cada matrícula da listagem e na linha de cada pessoa da lista de frequência. Os tipos são:
 
-1. **Listagem** ("Exportar Listagem", com os campos que você marcar: número de inscrição, Id do candidato, situação, nome, e-mail, CPF, nascimento, raça, deficiência, programa social, MCMV, telefone, WhatsApp, endereço, horário, polo, curso e data de inscrição). Cada linha é uma **inscrição**. Dela saem as **pessoas**, as **matrículas** e as **turmas**: o sistema oficial não exporta turmas, então elas são montadas juntando **período + curso + polo + horário** (o período vem do nome do curso, como em "2026.1 - Audiovisual…", ou do campo "Período" da tela). Marque todos os campos na exportação para as análises de perfil funcionarem.
+1. **Listagem** (a planilha de matrículas, com número de inscrição, Id do candidato, situação, nome, e-mail, CPF, nascimento, raça, deficiência, programa social, MCMV, telefone, WhatsApp, endereço, horário, polo, curso e data de inscrição). Cada linha é uma **inscrição**. O sistema oficial a exporta com nomes técnicos de coluna (`inscricao_id`, `candidato_nome`, `polo`, `curso`…), com o **número de inscrição seguido do período** (`QM05075/2026.1`) e com sim/não como `0` e `1`; os rótulos da tela de exportação ("Nome do Candidato") também são aceitos. Dela saem as **pessoas**, as **matrículas** e as **turmas**: o sistema oficial não exporta turmas, então elas são montadas juntando **período + curso + polo + horário**. O período vem, nesta ordem, do nome do curso ("2026.1 - Audiovisual…"), da própria inscrição (`QM05075/2026.1`) ou do campo "Período" da tela. Para as análises de perfil funcionarem, a exportação precisa trazer todos os campos.
 2. **Lista de frequência de uma turma** (uma linha por pessoa, uma coluna por aula, com Presente ou Faltou). É ligada à matrícula pelo **número de inscrição** (a turma é descoberta por ele, não pelo título). Importe a **listagem antes**. Vira as aulas da turma e recalcula a frequência e o risco de evasão de todos.
 
 Como funciona por dentro:
 
 - **Prévia antes de gravar:** a tela mostra quantas pessoas, matrículas e turmas são novas ou já existem, as turmas que serão montadas e os avisos (CPF com dígitos errados, e-mail inválido, pessoas que não estão na listagem, "Total de faltas" que não bate com as marcas…).
-- **Situações:** o sistema oficial escreve a situação do jeito dele ("Ativo", "Desistente"…). A tela sugere a nossa (ativa, trancada, evadida, concluída ou cancelada) e **pede para você escolher** quando não dá para ter certeza. A escolha fica guardada para as próximas importações.
+- **Situações:** o sistema oficial escreve a situação do jeito dele ("Inscrito", "Sorteado", "Desistente"…). A tela sugere a nossa (ativa, trancada, evadida, concluída ou cancelada), mostra a sugestão na tabela "Situações encontradas" para você confirmar ou trocar, e **pede para você escolher** quando não dá para ter certeza. A escolha fica guardada para as próximas importações. "Inscrito" e "Sorteado" descrevem a seleção, não a matrícula: por sugestão valem como **ativa**, já que quem está numa listagem de matrículas está cursando. A coluna `etapa_matricula` é guardada como veio (o significado é do sistema oficial).
 - **Reimportar é seguro:** pessoas são achadas pelo **Id do candidato** (depois CPF, depois e-mail), matrículas pelo número de inscrição, aulas pela data. Importar o mesmo arquivo de novo atualiza em vez de duplicar, e o que só existe aqui (nome social, observações, documentos, o que você lançou no diário) é preservado. Se o sistema oficial e este divergirem na situação de uma matrícula, vale o sistema oficial.
 - **Dados pessoais:** CPF, raça e deficiência são dados sensíveis (LGPD). Eles ficam só no navegador, e o `.gitignore` impede que planilhas (`dados/`, `*.xlsx`, `*.xls`, `*.csv`) entrem no Git: o repositório tem remoto no GitHub, nunca coloque exportações reais nele.
 
@@ -138,7 +146,9 @@ Detalhes e justificativas em [`docs/modelo-de-dados.md`](docs/modelo-de-dados.md
 Enquanto `js/core/config.js` estiver com `COLE_AQUI` **e** a página estiver em `localhost`, o sistema entra sozinho no modo local: um Firebase **simulado no navegador** (`js/dev/`) responde no lugar do real, e os dados ficam no **IndexedDB** deste navegador (cabem dezenas de milhares de linhas; o `localStorage` não caberia). Dá para entrar, importar, analisar, lançar chamada etc. sem configurar nada.
 
 - **Contas:** a tela de login mostra um botão por conta (Admin, Coordenação e Professor, para testar os três níveis de acesso). Os e-mails e a senha estão em [`js/dev/seed.js`](js/dev/seed.js). São contas de teste deste navegador, não de um servidor.
-- **Dois tipos de dado:** na primeira vez, o navegador traz um cenário de **exemplo** (fictício: turmas, alunos, aulas, avaliações). Em **Importar dados**, o botão **Limpar dados de exemplo** apaga tudo isso (menos o login) e, daí em diante, o que está no navegador é tratado como **dado de verdade**: nenhuma atualização do código o refaz ou apaga (`SEED_VERSAO` só vale para os dados de exemplo). A importação exige limpar os exemplos antes, para não misturar.
+- **Abre vazio:** na primeira visita o sistema está vazio (só o login das contas de teste), pronto para receber as planilhas. O que está no navegador é tratado como **dado de verdade**: nenhuma atualização do código o refaz ou apaga.
+- **Dados de exemplo (opcional):** para demonstrar o sistema, **Importar dados → Carregar dados de exemplo** traz um cenário fictício (turmas, alunos, aulas, avaliações). O botão só aparece com o sistema vazio, e a importação exige limpar os exemplos antes (**Limpar dados de exemplo**), para nunca misturar com pessoas de verdade. Os exemplos são descartáveis: se `SEED_VERSAO` mudar, o exemplo salvo some e o sistema volta a abrir vazio.
+- **Começar do zero:** **Apagar todos os dados** (em Importar dados) esvazia tudo; um backup é baixado antes, por segurança.
 - **Backup:** dado de verdade vive só neste navegador; se ele for limpo ou trocado, some. Use **Baixar backup** (também na faixa laranja do rodapé) de vez em quando e **Restaurar backup** para voltar ou mudar de computador. Use uma aba só: duas abas abertas ao mesmo tempo podem se sobrescrever.
 - **Integrações simuladas:** o envio de documentos (que usaria o Cloudinary) também funciona: o arquivo fica guardado no navegador, com limite de 600 KB.
 - **Aviso permanente:** a faixa laranja ("MODO DESENVOLVIMENTO" com os exemplos, "MODO LOCAL" com dados de verdade) aparece em todas as telas.
@@ -171,16 +181,27 @@ Depois abra `http://localhost:5500`. (`.claude/launch.json` guarda essa mesma co
 
 Para o login funcionar em `localhost`, o domínio já vem autorizado por padrão no Firebase Auth. Ao publicar, adicione seu domínio em Authentication → Configurações → Domínios autorizados.
 
+### Fluxo de uso, do clone às análises
+
+1. Clone o repositório e abra a pasta no VS Code. Clique com o botão direito em `index.html` → **Open with Live Server** (ou rode `tools\serve.ps1`). Não precisa instalar nada.
+2. Entre com a conta **Coordenação Dev** (botão na tela de login).
+3. No menu, abra **Importar dados**. O sistema abre vazio; se por acaso aparecer "dados de exemplo", clique em **Limpar dados de exemplo**.
+4. Exporte do sistema oficial a **Listagem** (todos os campos marcados) e a **lista de frequência** de cada turma, e salve os `.xlsx` no seu computador (o `.gitignore` já impede que planilhas entrem no Git).
+5. Em **Importar dados** há dois campos. No **1. Matrículas**, escolha ou arraste a **Listagem** e confira a prévia: escolha o que cada situação significa, se a tela pedir, e clique em **Importar matrículas**. No **2. Presenças e faltas**, envie as **listas de frequência** das turmas (pode selecionar várias de uma vez). Cada campo só aceita o seu tipo de planilha e avisa se você puser o arquivo no campo errado.
+6. Confira em **Turmas e presenças** (na mesma tela) quais turmas já têm presenças ligadas às matrículas, e abra **Análises**.
+
+Os dados ficam no navegador, ligados ao **endereço** da página (`127.0.0.1:5502` e `localhost:5500` são bancos separados): use sempre o mesmo. Em outro computador (ou depois de limpar o navegador) o sistema começa vazio: reimporte as planilhas ou use **Baixar backup** / **Restaurar backup**.
+
 ### Testes
 
 Abra `http://localhost:5500/testes/index.html` (com o servidor acima) e veja os testes rodarem no navegador, sem instalar nada. Eles usam só código puro e planilhas **fictícias** (geradas na hora, em `testes/fixtures.js`) e **nunca tocam nos dados guardados** do sistema. Rode-os depois de mexer em `js/domain/` ou em `js/core/planilha.js`.
 
 ## Próximos passos
 
-1. **Conferir com as planilhas reais:** o leitor e as colunas foram escritos a partir dos nomes que o sistema oficial mostra na tela de exportação, com planilhas fictícias. Coloque uma exportação de cada tipo em `dados/` (fora do Git), importe e ajuste o que não bater (nome de coluna, formato de data, situações, como o horário vem escrito).
+1. **Conferir com mais planilhas reais:** o leitor foi ajustado a um arquivo real de cada tipo (uma turma, 23 matrículas, 19 pessoas na lista de presença). Falta ver com várias turmas, outros polos, outros períodos e outros tipos de situação (desistentes, concluídos). A coluna **Situação** da lista de frequência ("Ativo"…) ainda não atualiza a situação da matrícula: é o sinal mais direto de quem desistiu, e vale usá-la.
 2. **Mais perguntas para as análises**, conforme a equipe for usando (cruzamentos de perfil com evasão, por exemplo).
 3. **Resultado final e boletim**: situação final (aprovado ou não) cruzando a avaliação (média ou Apto / Não apto) com a frequência mínima do curso. Só faz sentido se as notas também forem lançadas aqui.
-4. **Equipe**: telas para cadastrar professores e coordenadores e definir o papel de cada um (hoje a equipe só existe nos dados de exemplo).
+4. **Equipe**: telas para cadastrar professores e coordenadores e definir o papel de cada um (hoje a equipe só existe nas contas de teste do login).
 5. **Acabamento**: capturas de tela no README e mais testes.
 
 Já pronto: importação das duas planilhas do sistema oficial (com prévia, situações traduzidas e reimportação segura), **análises** (funil, perfil, frequência e evasão, comparação, com filtros e CSV), backup dos dados, login e painel (com visão própria do professor), cursos, turmas, alunos/matrículas, diário de classe com frequência e risco de evasão, **avaliações com a forma de avaliar escolhida em cada uma** (nota de 0 a 10 ou Apto / Não apto) e o módulo de editais, inscrições e sorteio (fora do menu).

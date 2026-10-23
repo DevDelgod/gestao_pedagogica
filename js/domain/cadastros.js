@@ -13,6 +13,16 @@ const DATA = /^\d{4}-\d{2}-\d{2}$/;
 const numero = (valor, padrao) => (valor === '' || valor === null || valor === undefined ? padrao : Number(valor));
 const texto = (valor) => String(valor ?? '').trim();
 
+/** Mensagem de nome curto demais ou longo demais (dizendo qual dos dois, e quanto o nome tem). null se estiver certo. */
+function erroDeNome(artigoENome, nome, maximo) {
+  if (nome.length < 2) return `Informe ${artigoENome} (pelo menos 2 caracteres).`;
+  if (nome.length > maximo) return `${artigoENome[0].toUpperCase()}${artigoENome.slice(1)} pode ter no máximo ${maximo} caracteres (este tem ${nome.length}).`;
+  return null;
+}
+
+/** O nome da turma que o sistema oficial dá (período, curso, polo, dias e horário) passa fácil de 120 caracteres. */
+const MAXIMO_NOME_TURMA = 200;
+
 export function validarCurso(entrada) {
   const nome = texto(entrada.nome);
   if (nome.length < 2 || nome.length > 120) return { erro: 'Informe o nome do curso (de 2 a 120 caracteres).' };
@@ -23,12 +33,16 @@ export function validarCurso(entrada) {
   const frequenciaMinima = numero(entrada.frequenciaMinima, 75);
   if (!(frequenciaMinima >= 0 && frequenciaMinima <= 100)) return { erro: 'A frequência mínima deve estar entre 0 e 100%.' };
 
-  // forma de avaliar sugerida ao criar uma avaliação; cada avaliação escolhe a sua
+  // forma de avaliar do curso: já vem marcada ao criar uma avaliação (cada avaliação ainda pode escolher a sua)
   const modoAvaliacao = entrada.modoAvaliacao ?? MODO_AVALIACAO.NOTA;
   if (!Object.values(MODO_AVALIACAO).includes(modoAvaliacao)) return { erro: 'Forma de avaliar inválida.' };
 
-  const mediaAprovacao = numero(entrada.mediaAprovacao, 7);
-  if (!(mediaAprovacao >= 0 && mediaAprovacao <= 10)) return { erro: 'A média de aprovação deve estar entre 0 e 10.' };
+  // a média de aprovação só existe quando o curso avalia por nota: num curso Apto / Não apto fica vazia
+  let mediaAprovacao = null;
+  if (modoAvaliacao === MODO_AVALIACAO.NOTA) {
+    mediaAprovacao = numero(entrada.mediaAprovacao, 7);
+    if (!(mediaAprovacao >= 0 && mediaAprovacao <= 10)) return { erro: 'A média de aprovação deve estar entre 0 e 10.' };
+  }
 
   const descricao = texto(entrada.descricao);
   if (descricao.length > 1000) return { erro: 'A descrição pode ter no máximo 1000 caracteres.' };
@@ -116,7 +130,8 @@ export function validarAluno(entrada, { hoje, cpfJaGravado = '', exigirResponsav
 
 export function validarTurma(entrada) {
   const nome = texto(entrada.nome);
-  if (nome.length < 2 || nome.length > 120) return { erro: 'Informe o nome da turma (de 2 a 120 caracteres).' };
+  const erroNome = erroDeNome('o nome da turma', nome, MAXIMO_NOME_TURMA);
+  if (erroNome) return { erro: erroNome };
 
   const cursoId = texto(entrada.cursoId);
   if (!cursoId) return { erro: 'Escolha o curso da turma.' };

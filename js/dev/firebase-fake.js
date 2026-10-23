@@ -11,10 +11,11 @@
  * O que NÃO imita: regras de segurança (firestore.rules), índices compostos e concorrência real.
  * Teste isso no Firebase de verdade (emulador ou projeto de teste).
  *
- * Os dados têm duas origens (`dev.origem()`):
- *  - 'exemplo': o cenário fictício de seed.js; é refeito quando SEED_VERSAO muda.
- *  - 'local': dados de verdade (importados ou digitados); NUNCA são refeitos nem apagados por uma atualização
- *    do código. Só saem por ação explícita (dev.limparDados, dev.restaurarBackup).
+ * O sistema abre VAZIO (só com o login das contas de teste). Os dados têm duas origens (`dev.origem()`):
+ *  - 'local': dados de verdade (importados ou digitados), ou o sistema vazio. NUNCA são refeitos nem apagados por
+ *    uma atualização do código: só saem por ação explícita (dev.limparDados, dev.restaurarBackup).
+ *  - 'exemplo': o cenário fictício de seed.js, só se a pessoa pedir (dev.carregarExemplos). É descartável: quando
+ *    SEED_VERSAO muda, o exemplo salvo é descartado e o sistema volta a abrir vazio.
  */
 import { baixarArquivo } from '../core/arquivos.js';
 import { CONTAS_DEV, SEED_VERSAO, semear, semearEquipe } from './seed.js';
@@ -128,9 +129,10 @@ async function carregar() {
       await gravarRegistro(texto, REGISTRO_CORROMPIDO).catch(() => {});
     }
   }
+  // primeira visita, exemplo antigo descartado ou dados ilegíveis: começa vazio, só com a equipe de teste
   store.clear();
-  semear(store, Timestamp);
-  origem = 'exemplo';
+  semearEquipe(store, Timestamp);
+  origem = 'local';
   gravarStorage(CHAVE_LEGADA, null);
   await salvar();
 }
@@ -351,6 +353,15 @@ export const dev = {
     await salvar();
   },
 
+  /** Apaga TUDO e carrega o cenário fictício de seed.js (para demonstrar o sistema). Os dados passam a ser 'exemplo'. */
+  async carregarExemplos() {
+    store.clear();
+    semear(store, Timestamp);
+    origem = 'exemplo';
+    atualizarFaixa();
+    await salvar();
+  },
+
   /** O banco inteiro como texto JSON (para guardar num arquivo). */
   backup: () => JSON.stringify({ app: 'fudev', formato: 1, origem, docs: [...store] }, substituto),
 
@@ -376,12 +387,6 @@ export const dev = {
   },
 };
 
-/** Apaga os dados guardados e recarrega: volta ao cenário de exemplo. */
-async function restaurarDadosDeExemplo() {
-  if (banco) await gravarRegistro(null).catch(() => {});
-  location.reload();
-}
-
 // ---------------------------------------------------------------------------
 // Avisos na tela: faixa do modo local e atalhos de login
 // ---------------------------------------------------------------------------
@@ -392,7 +397,7 @@ function atualizarFaixa() {
   faixa.querySelector('span').textContent = exemplo
     ? 'MODO DESENVOLVIMENTO · dados de exemplo neste navegador'
     : 'MODO LOCAL · seus dados ficam só neste navegador';
-  faixa.querySelector('button').textContent = exemplo ? 'Restaurar dados' : 'Baixar backup';
+  faixa.querySelector('button').textContent = exemplo ? 'Limpar exemplos' : 'Baixar backup';
 }
 
 function montarInterfaceDev() {
@@ -417,9 +422,12 @@ function montarInterfaceDev() {
   const faixa = document.createElement('div');
   faixa.id = 'dev-faixa';
   faixa.innerHTML = '<span></span><button type="button"></button>';
-  faixa.querySelector('button').addEventListener('click', () => {
+  faixa.querySelector('button').addEventListener('click', async () => {
     if (origem === 'local') return dev.baixarBackup();
-    if (confirm('Apagar as alterações feitas em teste e voltar aos dados de exemplo?')) restaurarDadosDeExemplo();
+    if (confirm('Apagar os dados de exemplo e deixar o sistema vazio?')) {
+      await dev.limparDados();
+      location.reload();
+    }
   });
   document.body.append(faixa);
   atualizarFaixa();

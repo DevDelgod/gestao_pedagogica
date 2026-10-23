@@ -19,6 +19,20 @@
           <p class="topo__sub" id="sub">Registre a chamada e o conteúdo de cada aula.</p>
         </header>
 
+        <section class="cartao bloco" id="avisos-faltas" aria-live="polite" hidden>
+          <div class="bloco__topo">
+            <div>
+              <h2 id="avisos-titulo">E-mails de falta</h2>
+              <p class="item__meta">
+                A cada <strong>3 faltas</strong> (3, 6, 9…) a pessoa deve receber um e-mail. Falta justificada não conta. O sistema não envia:
+                escreva o e-mail, envie e marque como enviado, para ele sair desta lista.
+              </p>
+            </div>
+            <button class="botao botao--fantasma" type="button" id="btn-avisos-lote" hidden>Já enviei todos até agora</button>
+          </div>
+          <div class="tabela-rolagem" id="avisos-tabela"></div>
+        </section>
+
         <div class="barra">
           <div class="campo">
             <label for="d-turma">Turma</label>
@@ -69,6 +83,23 @@
         <section class="lista" id="aulas" aria-live="polite"></section>
       </main>
     </div>
+
+    <dialog class="dialogo" id="dlg-justificar" aria-labelledby="jf-titulo">
+      <form id="form-justificar" novalidate>
+        <h2 id="jf-titulo">Justificar falta</h2>
+        <p class="dialogo__sub" id="jf-sub"></p>
+        <p class="aviso" id="jf-erro" role="alert" hidden></p>
+        <div class="campo">
+          <label for="jf-motivo">Motivo (opcional)</label>
+          <textarea id="jf-motivo" maxlength="300" placeholder="Ex.: atestado médico; avisou que ia viajar"></textarea>
+          <span class="campo__ajuda">Falta justificada deixa de contar para o e-mail de 3 faltas e para a frequência.</span>
+        </div>
+        <div class="dialogo__acoes">
+          <button class="botao botao--fantasma" type="button" data-fechar>Cancelar</button>
+          <button class="botao" type="submit" id="jf-salvar">Justificar</button>
+        </div>
+      </form>
+    </dialog>
 
     <script type="module" src="../js/pages/diario.js"></script>
   </body>

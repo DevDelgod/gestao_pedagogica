@@ -16,6 +16,7 @@
 import { PRESENCA, STATUS_MATRICULA as S, STATUS_TURMA, DIAS_SEMANA, idAula, idMatricula, novaAula, novaMatricula, novaTurma, novoAluno, novoCurso } from '../models/schema.js';
 import { cpfValido } from './cadastros.js';
 import { recalcularMatriculas, resumoDaChamada } from './diario.js';
+import { faltasAvisadasAoRecalcular } from './faltas.js';
 import { statusDoAluno } from './matricula.js';
 import { nomeExibicao } from './pessoa.js';
 
@@ -76,15 +77,25 @@ export function lerData(valor) {
 /** Ano de dois dígitos vira 20xx; se isso cair no futuro numa data de nascimento, era 19xx. */
 const corrigirSeculo = (iso, hoje) => (iso && iso > hoje ? `${Number(iso.slice(0, 4)) - 100}${iso.slice(4)}` : iso);
 
-/** Sim/Não escritos de qualquer jeito → true, false ou null (sem resposta). */
+/** Sim/Não escritos de qualquer jeito (Sim, não, true, 1, 0…) → true, false ou null (sem resposta). */
 export function lerSimNao(valor) {
   if (typeof valor === 'boolean') return valor;
+  if (typeof valor === 'number') return valor === 1 ? true : valor === 0 ? false : null;
   const t = chaveDeTexto(valor);
   if (!t) return null;
-  if (/^(sim|s|yes|true|verdadeiro|possui|x)$/.test(t)) return true;
-  if (/^(nao|n|no|false|falso|nenhum|nenhuma)$/.test(t)) return false;
+  if (/^(sim|s|yes|true|verdadeiro|possui|x|1)$/.test(t)) return true;
+  if (/^(nao|n|no|false|falso|nenhum|nenhuma|0)$/.test(t)) return false;
   return null;
 }
+
+/** Estados escritos por extenso → sigla (o sistema oficial mistura "RJ" e "Rio de Janeiro"). O que não conhece fica como veio. */
+const UFS = {
+  acre: 'AC', alagoas: 'AL', amapa: 'AP', amazonas: 'AM', bahia: 'BA', ceara: 'CE', 'distrito federal': 'DF', 'espirito santo': 'ES', goias: 'GO',
+  maranhao: 'MA', 'mato grosso': 'MT', 'mato grosso do sul': 'MS', 'minas gerais': 'MG', para: 'PA', paraiba: 'PB', parana: 'PR', pernambuco: 'PE',
+  piaui: 'PI', 'rio de janeiro': 'RJ', 'rio grande do norte': 'RN', 'rio grande do sul': 'RS', rondonia: 'RO', roraima: 'RR', 'santa catarina': 'SC',
+  'sao paulo': 'SP', sergipe: 'SE', tocantins: 'TO',
+};
+export const lerUf = (valor) => UFS[chaveDeTexto(valor)] ?? (texto(valor).length === 2 ? texto(valor).toUpperCase() : texto(valor));
 
 /** Um "Possui…?" mais o "Qual…?": { possui, qual } ou null quando a planilha não diz nada. */
 export function lerOpcaoComDetalhe(possui, qual) {
@@ -119,7 +130,9 @@ export function sugerirSituacao(statusExterno) {
   if (/\b(evad|evas|desist|abandon)/.test(t)) return S.EVADIDA;
   if (/\b(conclu|formad|aprovad|certific|finaliz)/.test(t)) return S.CONCLUIDA;
   if (/\b(cancel|indefer|exclu|reprov|inativ|desclassific|elimin)/.test(t)) return S.CANCELADA;
-  if (/^(ativ|cursand|matricul|regular|frequent|em curso|confirmad)/.test(t)) return S.ATIVA;
+  // "Inscrito" e "Sorteado" descrevem a seleção, não a matrícula: quem aparece numa listagem de matrículas (e tem
+  // presença) está cursando. A tela mostra a sugestão e a pessoa pode trocar.
+  if (/^(ativ|cursand|matricul|regular|frequent|em curso|confirmad|inscrit|sortead|selecionad|classificad|convocad)/.test(t)) return S.ATIVA;
   return null;
 }
 
@@ -128,32 +141,37 @@ export function sugerirSituacao(statusExterno) {
 // ---------------------------------------------------------------------------
 
 /** Cada campo, com os títulos de coluna que o sistema oficial pode usar (já sem acento nem pontuação). */
+/**
+ * O sistema oficial tem DOIS jeitos de nomear as colunas: os rótulos da tela de exportação ("Nome do Candidato") e os
+ * nomes técnicos da planilha que ele de fato gera ("candidato_nome"). Os dois valem (o "_" vira espaço na comparação).
+ */
 const COLUNAS_LISTAGEM = {
-  numeroInscricao: ['numero de inscricao', 'numero da inscricao', 'n de inscricao', 'n inscricao', 'inscricao'],
-  idCandidato: ['id do candidato', 'id candidato', 'id'],
-  statusExterno: ['status do candidato', 'status', 'situacao'],
-  nome: ['nome do candidato', 'nome'],
-  email: ['email do candidato', 'e mail do candidato', 'email', 'e mail'],
-  cpf: ['cpf do candidato', 'cpf'],
-  dataNascimento: ['data de nascimento', 'nascimento'],
-  raca: ['raca', 'raca cor', 'cor'],
-  deficiencia: ['possui alguma deficiencia', 'possui deficiencia', 'deficiencia'],
-  deficienciaQual: ['qual deficiencia'],
-  programaSocial: ['programa social'],
-  programaSocialQual: ['qual programa social'],
-  mcmv: ['reside em mcmv', 'mcmv'],
-  mcmvQual: ['qual mcmv'],
-  telefone: ['telefone do candidato', 'telefone'],
-  whatsapp: ['whatsapp do candidato', 'whatsapp'],
-  cep: ['cep do candidato', 'cep'],
-  rua: ['rua do candidato', 'rua', 'endereco'],
-  bairro: ['bairro do candidato', 'bairro'],
-  cidade: ['cidade do candidato', 'cidade'],
-  estado: ['estado do candidato', 'estado', 'uf'],
+  numeroInscricao: ['numero de inscricao', 'numero da inscricao', 'n de inscricao', 'n inscricao', 'inscricao', 'inscricao id'],
+  idCandidato: ['id do candidato', 'id candidato', 'candidato id', 'id'],
+  statusExterno: ['status do candidato', 'status candidato', 'status', 'situacao'],
+  nome: ['nome do candidato', 'candidato nome', 'nome'],
+  email: ['email do candidato', 'candidato email', 'e mail do candidato', 'email', 'e mail'],
+  cpf: ['cpf do candidato', 'candidato cpf', 'cpf'],
+  dataNascimento: ['data de nascimento', 'candidato data nasc', 'candidato data nascimento', 'nascimento'],
+  raca: ['raca', 'candidato raca', 'raca cor', 'cor'],
+  deficiencia: ['possui alguma deficiencia', 'possui deficiencia', 'candidato deficiencia', 'deficiencia'],
+  deficienciaQual: ['qual deficiencia', 'candidato deficiencia nome'],
+  programaSocial: ['programa social', 'candidato programa social'],
+  programaSocialQual: ['qual programa social', 'candidato programa social nome'],
+  mcmv: ['reside em mcmv', 'candidato mcmv', 'mcmv'],
+  mcmvQual: ['qual mcmv', 'candidato mcmv local'],
+  telefone: ['telefone do candidato', 'candidato telefone', 'telefone'],
+  whatsapp: ['whatsapp do candidato', 'candidato whatsapp', 'whatsapp'],
+  cep: ['cep do candidato', 'candidato cep', 'cep'],
+  rua: ['rua do candidato', 'candidato rua', 'rua', 'endereco'],
+  bairro: ['bairro do candidato', 'candidato bairro', 'bairro'],
+  cidade: ['cidade do candidato', 'candidato cidade', 'cidade'],
+  estado: ['estado do candidato', 'candidato estado', 'estado', 'uf'],
   horario: ['horario do curso', 'horario'],
   polo: ['polo do curso', 'polo'],
   curso: ['nome do curso', 'curso'],
-  dataInscricao: ['data de inscricao', 'inscrito em'],
+  dataInscricao: ['data de inscricao', 'data inscricao', 'inscrito em'],
+  etapaMatricula: ['etapa matricula', 'etapa da matricula'],
 };
 
 /** { campo: índice da coluna } para os títulos encontrados nesta linha. */
@@ -215,6 +233,16 @@ export function detectarFrequencia(linhas) {
 const seguroParaId = (valor) => texto(valor).replace(/[^A-Za-z0-9_-]/g, '');
 
 /**
+ * O "inscricao_id" do sistema oficial vem com o período colado: "QM05075/2026.1". A planilha de frequência traz só
+ * "QM05075", então o número que liga as duas é o da frente, e o período (2026.1) é guardado à parte, para montar a turma.
+ */
+export function lerInscricao(valor) {
+  const [numero, sufixo = ''] = texto(valor).split('/');
+  const periodo = /^\d{4}\.\d$/.test(sufixo.trim()) ? sufixo.trim() : '';
+  return { numero: seguroParaId(numero), periodo };
+}
+
+/**
  * Lê as linhas de uma listagem e devolve registros já limpos: nome em maiúsculas vira nome próprio, CPF só dígitos,
  * datas em AAAA-MM-DD, sim/não em verdadeiro/falso. Linhas sem nome ou sem curso são ignoradas (e contadas).
  * @param {Array<Array<unknown>>} linhas
@@ -236,13 +264,16 @@ export function lerListagem(linhas, { cabecalho, colunas }, { hoje }) {
       continue;
     }
 
+    const { numero: numeroInscricao, periodo: periodoDaInscricao } = lerInscricao(v('numeroInscricao'));
     const email = texto(v('email')).toLowerCase();
     const cpf = lerCpf(v('cpf'));
     const nascimentoTexto = texto(v('dataNascimento'));
     const nascimento = corrigirSeculo(lerData(v('dataNascimento')), hoje);
     registros.push({
       linha: i + 1, // número da linha na planilha, para as mensagens
-      numeroInscricao: seguroParaId(v('numeroInscricao')),
+      numeroInscricao,
+      periodo: periodoDaInscricao,
+      etapaMatricula: v('etapaMatricula') === null ? '' : texto(v('etapaMatricula')),
       idCandidato: seguroParaId(v('idCandidato')),
       statusExterno: texto(v('statusExterno')),
       nome,
@@ -258,7 +289,7 @@ export function lerListagem(linhas, { cabecalho, colunas }, { hoje }) {
       mcmv: lerOpcaoComDetalhe(v('mcmv'), v('mcmvQual')),
       telefone: texto(v('telefone')),
       whatsapp: texto(v('whatsapp')),
-      endereco: { cep: texto(v('cep')), rua: texto(v('rua')), bairro: texto(v('bairro')), cidade: texto(v('cidade')), estado: texto(v('estado')) },
+      endereco: { cep: texto(v('cep')), rua: texto(v('rua')), bairro: texto(v('bairro')), cidade: texto(v('cidade')), estado: lerUf(v('estado')) },
       horario: texto(v('horario')),
       polo: texto(v('polo')),
       curso,
@@ -271,10 +302,16 @@ export function lerListagem(linhas, { cabecalho, colunas }, { hoje }) {
 /** Semestre de uma data: '2026-03-10' → '2026.1'; '2026-09-01' → '2026.2'. */
 export const periodoDaData = (iso) => (iso ? `${iso.slice(0, 4)}.${Number(iso.slice(5, 7)) <= 6 ? 1 : 2}` : '');
 
-/** O período mais comum entre as datas de inscrição (ou o de hoje), para sugerir quando o nome do curso não traz o período. */
+/**
+ * O período mais comum nas linhas: o da própria inscrição ("QM05075/2026.1") ou, na falta dele, o da data de inscrição;
+ * sem nenhum dos dois, o de hoje. Serve de padrão quando uma linha não diz o período.
+ */
 export function sugerirPeriodo(registros, hoje) {
   const contagem = new Map();
-  registros.forEach((r) => r.dataInscricao && contagem.set(periodoDaData(r.dataInscricao), (contagem.get(periodoDaData(r.dataInscricao)) ?? 0) + 1));
+  for (const r of registros) {
+    const periodo = r.periodo || periodoDaData(r.dataInscricao);
+    if (periodo) contagem.set(periodo, (contagem.get(periodo) ?? 0) + 1);
+  }
   return [...contagem].sort((a, b) => b[1] - a[1])[0]?.[0] ?? periodoDaData(hoje);
 }
 
@@ -305,13 +342,13 @@ export function lerHorario(valor) {
 const PERIODO_NO_NOME = /^\s*(\d{4}\.\d)\s*[-–—]\s*(.+)$/;
 
 /**
- * A turma de uma linha: período + curso + polo + horário. Se o nome do curso já começa com o período
- * ("2026.1 - Audiovisual para Mulheres"), ele vale; senão vale o período padrão escolhido na importação.
- * O id é o mesmo em qualquer reimportação.
+ * A turma de uma linha: período + curso + polo + horário. O período vale, nesta ordem: o do nome do curso
+ * ("2026.1 - Audiovisual para Mulheres"), o da inscrição da própria linha ("QM05075/2026.1") e, por fim, o período
+ * padrão escolhido na importação. O id é o mesmo em qualquer reimportação.
  */
-export function descreverTurma({ curso, polo, horario }, periodoPadrao) {
+export function descreverTurma({ curso, polo, horario, periodo: periodoDaLinha = '' }, periodoPadrao) {
   const m = PERIODO_NO_NOME.exec(curso);
-  const periodo = m ? m[1] : periodoPadrao;
+  const periodo = m ? m[1] : periodoDaLinha || periodoPadrao;
   const nomeCurso = texto(m ? m[2] : curso);
   const chave = [periodo, nomeCurso, polo, horario].map(chaveDeTexto).join('|');
   return {
@@ -494,7 +531,7 @@ export function planejarListagem(registros, existentes, { periodoPadrao, mapaSta
     const nomeDoAluno = nomeExibicao({ nome: aluno.campos.nome, nomeSocial: aluno.existente?.nomeSocial });
     const existente = matriculasAtuais.get(m.id);
     const status = m.situacao ?? S.ATIVA;
-    const externos = so({ numeroInscricao: r.numeroInscricao, statusExterno: r.statusExterno, dataInscricao: r.dataInscricao });
+    const externos = so({ numeroInscricao: r.numeroInscricao, statusExterno: r.statusExterno, dataInscricao: r.dataInscricao, etapaMatricula: r.etapaMatricula });
     return {
       id: m.id,
       novo: !existente,
@@ -635,7 +672,12 @@ function indiceDeInscricoes(matriculas) {
  * (mais confiável) ou, na falta disso, pelo texto "Turma:" do topo. null se não achar.
  */
 export function resolverTurmaDaFrequencia(leitura, { matriculas, turmas }) {
-  const achar = indiceDeInscricoes(matriculas);
+  // O mesmo número de inscrição pode se repetir em períodos diferentes: o período do título ("2026.1 - …") escolhe
+  // entre eles. Sem título ou sem turma desse período, vale tudo.
+  const periodo = interpretarTituloDaTurma(leitura.turmaTexto).periodo;
+  const turmaPorId = new Map(turmas.map((t) => [t.id, t]));
+  const doPeriodo = periodo ? matriculas.filter((m) => turmaPorId.get(m.turmaId)?.periodo === periodo) : [];
+  const achar = indiceDeInscricoes(doPeriodo.length ? doPeriodo : matriculas);
   const contagem = new Map();
   for (const p of leitura.pessoas) {
     const m = achar(p.numeroInscricao);
@@ -700,11 +742,13 @@ export function planejarFrequencia(leitura, { turma, curso, matriculas, aulas })
   });
 
   const aulasFinais = [...aulas.filter((a) => !planoAulas.some((p) => p.data === a.data)), ...planoAulas].map((a) => ({ data: a.data, registros: a.registros }));
+  const antes = new Map(matriculas.map((m) => [m.id, m]));
   const resumos = recalcularMatriculas({
     aulas: aulasFinais,
     matriculas: matriculas.map((m) => ({ id: m.id, alunoId: m.alunoId, status: m.status })),
     frequenciaMinima: curso?.frequenciaMinima,
-  });
+    // a planilha traz o histórico da turma: quem ainda não tinha chamada recebe as faltas dela como já avisadas (ver domain/faltas.js)
+  }).map((r) => ({ ...r, faltasAvisadas: faltasAvisadasAoRecalcular(antes.get(r.matriculaId), r.frequencia.faltas, { historico: true }) }));
 
   return {
     tipo: 'frequencia',

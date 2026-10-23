@@ -26,7 +26,7 @@ import {
 import { COLECOES } from '../models/schema.js';
 import { alunosRepo } from './alunos.service.js';
 import { cursosRepo } from './cursos.service.js';
-import { listarAulasDaTurma } from './diario.service.js';
+import { aulasRepo, listarAulasDaTurma } from './diario.service.js';
 import { matriculasRepo } from './matriculas.service.js';
 import { turmasRepo } from './turmas.service.js';
 
@@ -40,29 +40,42 @@ const ID_CONFIGURACAO = 'importacao';
 // Ler o arquivo
 // ---------------------------------------------------------------------------
 
+const MENSAGEM_DESCONHECIDA = {
+  listagem: 'Não reconheci esta planilha como a listagem de matrículas. Ela precisa vir de "Exportar Listagem" do sistema oficial, com colunas como Nome do candidato e Nome do curso.',
+  frequencia: 'Não reconheci esta planilha como a lista de frequência de uma turma. Ela precisa ter as colunas Inscrição e Nome e uma coluna para cada aula (com as datas).',
+  qualquer: 'Não reconheci esta planilha. Use a "Listagem" de matrículas exportada do sistema oficial ou a lista de frequência da turma (com Inscrição, Nome e uma coluna por aula).',
+};
+
 /**
  * Descobre que planilha é e lê o que dá para ler dela, sem gravar nada.
+ * Cada campo da tela espera um tipo; se a pessoa subir o arquivo no campo errado, a mensagem diz onde ele vai.
  * @param {File} arquivo
+ * @param {'listagem' | 'frequencia' | null} [esperado] o tipo que o campo aceita (null = qualquer um)
  * @returns {Promise<{ tipo: 'listagem', nomeArquivo: string, registros: object[], ignoradas: number[], periodoSugerido: string }
  *   | { tipo: 'frequencia', nomeArquivo: string, leitura: object }>}
  */
-export async function lerArquivoDeImportacao(arquivo) {
+export async function lerArquivoDeImportacao(arquivo, esperado = null) {
   const { abas } = await lerPlanilha(arquivo);
   for (const aba of abas) {
     const frequencia = detectarFrequencia(aba.linhas);
-    if (frequencia) return { tipo: 'frequencia', nomeArquivo: arquivo.name, leitura: lerFrequencia(aba.linhas, frequencia) };
+    if (frequencia) {
+      if (esperado === 'listagem') {
+        throw new ErroDeNegocio('tipo-errado', 'Esta é a lista de frequência de uma turma (presenças e faltas). Suba-a no campo "Presenças e faltas".');
+      }
+      return { tipo: 'frequencia', nomeArquivo: arquivo.name, leitura: lerFrequencia(aba.linhas, frequencia) };
+    }
 
     const listagem = detectarListagem(aba.linhas);
     if (listagem) {
+      if (esperado === 'frequencia') {
+        throw new ErroDeNegocio('tipo-errado', 'Esta é a listagem de matrículas. Suba-a no campo "Matrículas".');
+      }
       const hoje = hojeISO();
       const { registros, ignoradas } = lerListagem(aba.linhas, listagem, { hoje });
       return { tipo: 'listagem', nomeArquivo: arquivo.name, registros, ignoradas, periodoSugerido: sugerirPeriodo(registros, hoje) };
     }
   }
-  throw new ErroDeNegocio(
-    'planilha-desconhecida',
-    'Não reconheci esta planilha. Use a "Listagem" de candidatos exportada do sistema oficial (com Nome do candidato e Nome do curso) ou a lista de frequência da turma (com Inscrição, Nome e uma coluna por aula).',
-  );
+  throw new ErroDeNegocio('planilha-desconhecida', MENSAGEM_DESCONHECIDA[esperado ?? 'qualquer']);
 }
 
 /** Tudo o que já está no sistema e que uma importação precisa conhecer para saber o que é novo. */
@@ -70,6 +83,8 @@ export async function carregarExistentes() {
   const [alunos, matriculas, turmas, cursos] = await Promise.all([alunosRepo.listar(), matriculasRepo.listar(), turmasRepo.listar(), cursosRepo.listar()]);
   return { alunos, matriculas, turmas, cursos };
 }
+
+const listarTodasAsAulas = () => aulasRepo.listar();
 
 /** Como a pessoa traduziu, em importações anteriores, as situações da planilha para as nossas ({ 'ativo': 'ativa' }). */
 export async function obterMapaDeSituacoes() {
@@ -143,7 +158,9 @@ export async function prepararFrequencia(leitura) {
 export async function aplicarFrequencia(plano, { arquivo, aoProgresso }) {
   const escritas = [
     ...plano.aulas.map((a) => gravarNovoOuAtualizar(COLECOES.AULAS, a, a.dados)),
-    ...plano.resumos.map(({ matriculaId, frequencia, riscoEvasao }) => atualizar(COLECOES.MATRICULAS, matriculaId, { frequencia, riscoEvasao })),
+    ...plano.resumos.map(({ matriculaId, frequencia, riscoEvasao, faltasAvisadas }) =>
+      atualizar(COLECOES.MATRICULAS, matriculaId, { frequencia, riscoEvasao, ...(faltasAvisadas === null ? {} : { faltasAvisadas }) }),
+    ),
   ];
   await gravarEmLotes(escritas, aoProgresso);
 
@@ -156,6 +173,39 @@ export async function aplicarFrequencia(plano, { arquivo, aoProgresso }) {
     avisos: plano.avisos.slice(0, 30).map((a) => a.texto),
   });
   return plano.resumo;
+}
+
+/**
+ * Quais turmas já têm presenças importadas ligadas às matrículas. A ligação é por turma: as aulas de uma turma guardam
+ * a marca de cada pessoa, e cada marca pertence a uma matrícula dela.
+ * @returns {Promise<Array<{ id: string, nome: string, curso: string, polo: string, matriculas: number, ativas: number, aulas: number, ultimaAula: string|null }>>}
+ *   as turmas SEM presença primeiro, para o que falta importar ficar à vista
+ */
+export async function resumoDasTurmas() {
+  const [matriculas, turmas, aulas] = await Promise.all([matriculasRepo.listar(), turmasRepo.listar(), listarTodasAsAulas()]);
+  const porTurma = (itens) => {
+    const mapa = new Map();
+    itens.forEach((i) => mapa.set(i.turmaId, [...(mapa.get(i.turmaId) ?? []), i]));
+    return mapa;
+  };
+  const matriculasDaTurma = porTurma(matriculas);
+  const aulasDaTurma = porTurma(aulas);
+  return turmas
+    .map((t) => {
+      const doGrupo = matriculasDaTurma.get(t.id) ?? [];
+      const dasAulas = aulasDaTurma.get(t.id) ?? [];
+      return {
+        id: t.id,
+        nome: t.nome,
+        curso: t.cursoNome,
+        polo: t.polo || '',
+        matriculas: doGrupo.length,
+        ativas: doGrupo.filter((m) => m.status === 'ativa').length,
+        aulas: dasAulas.length,
+        ultimaAula: dasAulas.map((a) => a.data).sort().at(-1) ?? null,
+      };
+    })
+    .sort((a, b) => Number(a.aulas > 0) - Number(b.aulas > 0) || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 /** Importações feitas, da mais recente para a mais antiga. */

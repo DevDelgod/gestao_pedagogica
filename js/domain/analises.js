@@ -125,8 +125,8 @@ const faixaEtaria = (nascimento, hoje) => {
   return idade < 0 ? null : FAIXAS.find((f) => idade <= f.ate).rotulo;
 };
 
-/** "Bolsa Família; BPC" → ["Bolsa Família", "BPC"]. */
-const dividir = (valor) => texto(valor).split(/[;,]/).map(texto).filter(Boolean);
+/** "Bolsa Família; BPC", "Bolsa família e mumbuca" ou "Bolsa família, mumbuca" → uma entrada por programa. */
+const dividir = (valor) => texto(valor).split(/\s*[;,]\s*|\s+e\s+/i).map(texto).filter(Boolean);
 
 const simNao = (opcao) => (opcao?.possui === true ? 'Sim' : opcao?.possui === false ? 'Não' : null);
 

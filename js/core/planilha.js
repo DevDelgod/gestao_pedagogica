@@ -209,7 +209,9 @@ function lerAba(doc, textos, datas) {
     }
     linhas[indice] = valores;
   }
-  const largura = Math.max(0, ...linhas.map((l) => l?.length ?? 0));
+  // O Excel não grava linhas vazias (as que faltam são buracos na lista): a largura é calculada sem espalhar a lista,
+  // porque espalhar um buraco dá `undefined` e `Math.max(…, undefined)` dá NaN.
+  const largura = linhas.reduce((maior, l) => Math.max(maior, l?.length ?? 0), 0);
   return Array.from({ length: linhas.length }, (_, i) => Array.from({ length: largura }, (_, j) => linhas[i]?.[j] ?? null));
 }
 

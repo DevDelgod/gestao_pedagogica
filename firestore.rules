@@ -39,7 +39,7 @@ service cloud.firestore {
     // Professor só pode alterar o resumo acadêmico da matrícula (recalculado após chamada/nota).
     function soResumoAcademico() {
       return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['frequencia', 'riscoEvasao', 'media', 'aptidao', 'atualizadoEm']);
+        .hasOnly(['frequencia', 'riscoEvasao', 'media', 'aptidao', 'faltasAvisadas', 'atualizadoEm']);
     }
 
     // ---------- equipe ----------

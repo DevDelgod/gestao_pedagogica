@@ -39,7 +39,8 @@ Este sistema é **secundário**: as pessoas, matrículas e a chamada chegam por 
 | `alunos` | `idExterno` | o "Id do candidato" do sistema oficial: com ele, reimportar acha a mesma pessoa (senão, CPF e depois e-mail) |
 | `alunos` | `raca`, `deficiencia`, `programaSocial`, `mcmv` | perfil, como declarado no cadastro oficial. As três últimas são `{ possui: true \| false, qual }`; ausente = a planilha não disse |
 | `alunos` | `whatsapp`, `endereco { cep, rua, bairro, cidade, estado }`, `origem` | contato e endereço completos; `origem` é `importacao` ou `manual` |
-| `matriculas` | `numeroInscricao` | ex.: `QM05075`; é por ele que a planilha de frequência acha a matrícula |
+| `matriculas` | `numeroInscricao` | ex.: `QM05075`; é por ele que a planilha de frequência acha a matrícula. O `inscricao_id` do sistema oficial vem com o período colado (`QM05075/2026.1`): o período vai para a turma, e aqui fica só o número. Se o mesmo número existir em dois períodos, o período do título da lista de frequência escolhe entre eles |
+| `matriculas` | `etapaMatricula` | a coluna `etapa_matricula` como veio (ex.: `7`); o significado é do sistema oficial |
 | `matriculas` | `statusExterno`, `dataInscricao`, `origem` | a situação como o sistema oficial escreve ("Ativo"), a data de inscrição e a origem. A nossa `status` é a tradução, escolhida na tela de importação |
 | `turmas` | `polo`, `periodo`, `horarioTexto`, `origem` | onde, quando ("2026.1") e o horário como vem escrito ("Terça, Quarta e Quinta-feira - 18:00 às 21:00"); `diasSemana`, `horarioInicio` e `horarioFim` são lidos desse texto quando dá |
 | `importacoes` | `tipo`, `arquivo`, `resumo`, `avisos` | uma linha por planilha importada (com os avisos) |
@@ -146,7 +147,7 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
   "ativo": true
 }
 ```
-`modoAvaliacao` é só a **forma de avaliar sugerida** ao criar uma avaliação do curso: `nota` ou `apto`. Quem cria a avaliação pode escolher a outra, e as duas podem existir na mesma turma. `mediaAprovacao` vale para as avaliações por nota. Cursos antigos, sem o campo, sugerem `nota`.
+`modoAvaliacao` é a **forma de avaliar do curso**, `nota` ou `apto`, e já vem marcada ao criar uma avaliação dele. Quem cria a avaliação pode escolher a outra, e as duas podem existir na mesma turma. **`mediaAprovacao` só existe no curso por nota**: num curso Apto / Não apto a tela esconde o campo e o valor fica `null`. Cursos antigos, sem o campo, valem como `nota`.
 
 ### `turmas/{turmaId}`
 ```json
@@ -321,6 +322,8 @@ Guarda ids, não nomes (o registro pode ser divulgado sem expor dados pessoais).
   "aptidao": null
 }
 ```
+**E-mail a cada 3 faltas:** `avisosDeFalta` guarda quais e-mails de falta já foram enviados, `{ "3": { "em": "2026-10-08", "por": "<uid>" }, "6": {…} }`. Regras em `js/domain/faltas.js`: a cada **3 faltas não justificadas** (3, 6, 9…) a pessoa deve receber um e-mail; falta justificada não conta. `faltasAvisadas` (número, ou `null` enquanto não existe) é a **marca de avisos**: até quantas faltas o passado já foi tratado. Um aviso é **pendente** quando a marca de 3 está acima de `faltasAvisadas` (as faltas a alcançaram depois) e ela não está em `avisosDeFalta`. Sem `faltasAvisadas`, o passado vale como avisado, **exceto a marca em que a pessoa está exatamente** (3, 6, 9…): por isso quem tem 4 ou 5 faltas não aparece, e quem tem 3 ou 6 aparece uma vez. A marca é gravada **antes** de as faltas crescerem (na primeira chamada ou importação de presenças que toca a matrícula) e sobe ao marcar como enviado, nunca desce. O sistema **não envia** e-mail: o Diário lista quem precisa receber (com as faltas e um rascunho que abre o programa de e-mail), e a coordenação marca como enviado (só ela grava, pelas regras do Firestore). Uma justificativa que tira a pessoa do múltiplo de 3 faz o aviso pendente sumir; um aviso já marcado continua registrado.
+
 `media` vem das avaliações por nota e `aptidao` (`{ "avaliadas": 3, "aptas": 2, "naoAptas": 1 }`) das avaliações Apto / Não apto. Cada uma fica `null` enquanto a pessoa não tem resultado daquela forma (numa turma que só usa uma das formas, a outra fica sempre `null`). `status`: `ativa` | `trancada` | `evadida` | `concluida` | `cancelada`. Ao mudar de situação a matrícula ganha `motivoSituacao`, `situacaoEm` e `situacaoPor`.
 
 **Ciclo da matrícula** (`js/domain/matricula.js`; só a matrícula **ativa** ocupa vaga):
@@ -341,9 +344,11 @@ Guarda ids, não nomes (o registro pode ser divulgado sem expor dados pessoais).
   "conteudo": "Introdução ao HTML: tags, atributos e estrutura da página.",
   "professorId": "uidDoProfessor",
   "registros": { "a1b2": "P", "c3d4": "F", "e5f6": "J" },
+  "justificativas": { "e5f6": "Atestado médico" },
   "resumo": { "presentes": 1, "faltas": 1, "justificadas": 1 }
 }
 ```
+`justificativas` guarda o **motivo** (opcional, até 300 caracteres) de quem está com falta justificada (`J`); o motivo de quem não está com `J` é descartado. Uma falta de uma aula já gravada pode ser justificada (ou ter a justificativa desfeita) sem refazer a chamada: `justificarFalta` / `desfazerJustificativa` (`js/services/diario.service.js`) mexem só naquela marca e recalculam a frequência da turma.
 Marcação: `P` presente · `F` falta · `J` falta justificada (conta como presença no percentual por padrão; configurável em `calcularFrequencia`). Quem entra na chamada de uma data (`pessoasDaChamada`): as matrículas **ativas feitas até aquela data** e quem já consta na chamada gravada daquele dia, mesmo que hoje esteja trancado ou tenha saído.
 
 ### `avaliacoes/{avaliacaoId}`

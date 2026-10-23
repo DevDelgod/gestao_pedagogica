@@ -664,6 +664,55 @@ a.botao {
   gap: var(--espaco-1);
 }
 
+.chamada__titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-1) var(--espaco-2);
+}
+
+/* motivo da justificativa: ocupa a linha de baixo, só aparece com a falta justificada */
+.chamada__motivo {
+  flex: 1 1 100%;
+}
+
+.entrada-larga {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--espaco-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font: inherit;
+}
+
+/* "Ver faltas": cada falta com a data, o motivo e o botão de justificar */
+.faltas-lista summary {
+  width: max-content;
+  cursor: pointer;
+}
+
+.faltas-lista__itens {
+  display: grid;
+  gap: var(--espaco-1);
+  margin: var(--espaco-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.faltas-lista__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-1) var(--espaco-3);
+  font-size: 0.9rem;
+}
+
+.faltas-lista__motivo {
+  flex: 1 1 160px;
+}
+
 .marca {
   min-width: 48px;
   min-height: 44px;
@@ -784,6 +833,19 @@ a.botao {
 .tabela select[aria-invalid='true'] {
   border-color: var(--cor-erro);
   background: var(--cor-erro-fundo);
+}
+
+/* um arquivo dentro de uma remessa (várias planilhas de frequência de uma vez) */
+.bloco-item {
+  display: grid;
+  gap: var(--espaco-3);
+  padding: var(--espaco-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+}
+
+.bloco-item h3 {
+  overflow-wrap: anywhere;
 }
 
 .avisos {

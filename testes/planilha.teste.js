@@ -27,6 +27,12 @@ grupo('Leitor de planilhas', () => {
     igual(abas[0].linhas, [['a', null, 'c'], [null, null, null], ['x', null, null]]);
   });
 
+  teste('planilha que omite as linhas vazias (como o Excel faz) sai completa, sem perder as outras', async () => {
+    const arquivo = await criarXlsx([{ nome: 'A', linhas: [[], ['Turma', 'T1'], [], ['Inscrição', 'Nome'], ['QM1', 'Ana']] }], 'x.xlsx', { omitirLinhasVazias: true });
+    const { abas } = await lerPlanilha(arquivo);
+    igual(abas[0].linhas, [[null, null], ['Turma', 'T1'], [null, null], ['Inscrição', 'Nome'], ['QM1', 'Ana']]);
+  });
+
   teste('número de série do Excel vira data', () => {
     igual(serialParaData(25569), '1970-01-01');
     igual(serialParaData(45658), '2025-01-01');

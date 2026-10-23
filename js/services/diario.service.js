@@ -11,7 +11,8 @@ import { auditoriaDeCriacao, criarRepo } from '../core/repo.js';
 import { ErroDeNegocio } from '../core/erros.js';
 import { hojeISO } from '../core/datas.js';
 import { recalcularMatriculas, resumoDaChamada, validarAula } from '../domain/diario.js';
-import { COLECOES, STATUS_MATRICULA, STATUS_TURMA, idAula, novaAula } from '../models/schema.js';
+import { faltasAvisadasAoRecalcular } from '../domain/faltas.js';
+import { COLECOES, PRESENCA, STATUS_MATRICULA, STATUS_TURMA, idAula, novaAula } from '../models/schema.js';
 import { listarMatriculasDaTurma } from './matriculas.service.js';
 
 export const aulasRepo = criarRepo(COLECOES.AULAS);
@@ -24,13 +25,46 @@ export async function listarAulasDaTurma(turmaId) {
 
 /**
  * Grava (ou corrige) a chamada de uma data.
- * @param {{ turmaId: string, data: string, conteudo?: string, registros: Record<string, 'P'|'F'|'J'> }} aula
+ * @param {{ turmaId: string, data: string, conteudo?: string, registros: Record<string, 'P'|'F'|'J'>, justificativas?: Record<string, string> }} aula
+ *   `justificativas`: o motivo (opcional) de cada falta justificada ('J')
  * @returns {Promise<{ resumo: { presentes: number, faltas: number, justificadas: number }, emRisco: number }>}
  */
-export function registrarAula({ turmaId, data, conteudo = '', registros }) {
-  const { dados, erro } = validarAula({ data, conteudo, registros }, { hoje: hojeISO() });
+export function registrarAula({ turmaId, data, conteudo = '', registros, justificativas = {} }) {
+  const { dados, erro } = validarAula({ data, conteudo, registros, justificativas }, { hoje: hojeISO() });
   if (erro) throw new ErroDeNegocio('dados-invalidos', erro);
   return aplicar({ turmaId, data: dados.data, aula: dados });
+}
+
+async function aulaGravada(turmaId, data) {
+  const aula = await aulasRepo.obter(idAula(turmaId, data));
+  if (!aula) throw new ErroDeNegocio('nao-encontrado', 'Não há aula registrada nesta data.');
+  return aula;
+}
+
+/**
+ * Justifica UMA falta de uma pessoa, em uma aula já registrada: a marca vira 'J' (sai da conta de faltas) e o motivo
+ * (opcional) fica guardado. A frequência da turma é recalculada, como em qualquer gravação de aula.
+ */
+export async function justificarFalta({ turmaId, data, alunoId, motivo = '' }) {
+  const aula = await aulaGravada(turmaId, data);
+  if (![PRESENCA.FALTA, PRESENCA.JUSTIFICADA].includes(aula.registros?.[alunoId])) {
+    throw new ErroDeNegocio('sem-falta', 'Esta pessoa não tem falta nesta aula.');
+  }
+  return registrarAula({
+    turmaId,
+    data,
+    conteudo: aula.conteudo,
+    registros: { ...aula.registros, [alunoId]: PRESENCA.JUSTIFICADA },
+    justificativas: { ...aula.justificativas, [alunoId]: motivo },
+  });
+}
+
+/** Desfaz a justificativa: a falta volta a contar, e o motivo é apagado. */
+export async function desfazerJustificativa({ turmaId, data, alunoId }) {
+  const aula = await aulaGravada(turmaId, data);
+  if (aula.registros?.[alunoId] !== PRESENCA.JUSTIFICADA) throw new ErroDeNegocio('sem-justificativa', 'Esta falta não está justificada.');
+  const { [alunoId]: _motivo, ...justificativas } = aula.justificativas ?? {};
+  return registrarAula({ turmaId, data, conteudo: aula.conteudo, registros: { ...aula.registros, [alunoId]: PRESENCA.FALTA }, justificativas });
 }
 
 /** Exclui a aula de uma data e recalcula a frequência sem ela (só a gestão pode, pelas regras). */
@@ -45,7 +79,7 @@ async function aplicar({ turmaId, data, aula }) {
       data,
       aula,
       outrasDatas: aulas.map((a) => a.data).filter((d) => d !== data),
-      matriculas: matriculas.map((m) => ({ id: m.id, alunoId: m.alunoId, status: m.status })),
+      matriculas: matriculas.map((m) => ({ id: m.id, alunoId: m.alunoId, status: m.status, frequencia: m.frequencia, faltasAvisadas: m.faltasAvisadas })),
       professorId: auth.currentUser?.uid ?? null,
     }),
   );
@@ -90,18 +124,27 @@ export async function aplicarNaTransacao(tx, { turmaId, data, aula, outrasDatas,
     tx.update(aulaRef, {
       conteudo: aula.conteudo,
       registros: aula.registros,
+      justificativas: aula.justificativas ?? {},
       resumo: resumoDaChamada(aula.registros),
       atualizadoEm: serverTimestamp(),
     });
   } else {
     tx.set(aulaRef, {
-      ...novaAula({ turmaId, data, conteudo: aula.conteudo, professorId, registros: aula.registros }),
+      ...novaAula({ turmaId, data, conteudo: aula.conteudo, professorId, registros: aula.registros, justificativas: aula.justificativas }),
       resumo: resumoDaChamada(aula.registros),
       ...auditoriaDeCriacao(),
     });
   }
+  const antes = new Map(matriculas.map((m) => [m.id, m]));
   atualizacoes.forEach(({ matriculaId, frequencia, riscoEvasao }) => {
-    tx.update(doc(db, COLECOES.MATRICULAS, matriculaId), { frequencia, riscoEvasao, atualizadoEm: serverTimestamp() });
+    // a marca de e-mails de falta nasce ANTES de as faltas crescerem: assim as faltas novas alcançam marcas novas
+    const avisada = faltasAvisadasAoRecalcular(antes.get(matriculaId), frequencia.faltas);
+    tx.update(doc(db, COLECOES.MATRICULAS, matriculaId), {
+      frequencia,
+      riscoEvasao,
+      ...(avisada === null ? {} : { faltasAvisadas: avisada }),
+      atualizadoEm: serverTimestamp(),
+    });
   });
 
   const ativas = new Set(matriculas.filter((m) => m.status === STATUS_MATRICULA.ATIVA).map((m) => m.id));

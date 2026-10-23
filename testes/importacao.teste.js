@@ -9,16 +9,19 @@ import {
   lerData,
   lerFrequencia,
   lerHorario,
+  lerInscricao,
   lerListagem,
   lerOpcaoComDetalhe,
   lerSimNao,
+  lerUf,
   planejarFrequencia,
   planejarListagem,
   resolverTurmaDaFrequencia,
+  sugerirPeriodo,
   sugerirSituacao,
   titularNome,
 } from '../js/domain/importacao.js';
-import { CABECALHO_LISTAGEM, cpfDe, criarXlsx, linhaListagem, linhasDaFrequencia, linhasDaListagem } from './fixtures.js';
+import { CABECALHO_LISTAGEM, cpfDe, criarXlsx, linhaListagem, linhasDaFrequencia, linhasDaListagem, linhasDaListagemOficial } from './fixtures.js';
 
 const HOJE = '2026-10-23';
 const NADA = { alunos: [], matriculas: [], turmas: [], cursos: [] };
@@ -296,6 +299,8 @@ grupo('Importar a frequência', () => {
     const resumoDe = (inscricao) => plano.resumos.find((r) => r.matriculaId === existentes.matriculas.find((m) => m.numeroInscricao === inscricao).id);
     igual([resumoDe('QM00002').frequencia.faltas, resumoDe('QM00002').frequencia.percentual, resumoDe('QM00002').riscoEvasao], [3, 0, true]); // 3 faltas seguidas
     igual([resumoDe('QM00001').frequencia.percentual, resumoDe('QM00001').riscoEvasao], [100, false]);
+    // o histórico da planilha já foi tratado pela equipe: só a marca em que a pessoa está agora (3 faltas) fica para avisar
+    igual([resumoDe('QM00002').faltasAvisadas, resumoDe('QM00001').faltasAvisadas], [2, 0]);
   });
 
   teste('somar a uma aula que já existe mantém quem não está na planilha', async () => {
@@ -320,5 +325,82 @@ grupo('Importar a frequência', () => {
     const leitura = lerFrequencia(linhas, detectarFrequencia(linhas));
     igual(leitura.pessoas[0].marcas, [null]);
     afirmar(leitura.avisos.some((a) => a.includes('Talvez')));
+  });
+
+  teste('a lista de frequência de um .xlsx que omite linhas vazias (como o do sistema oficial) é reconhecida', async () => {
+    const arquivo = await criarXlsx([{ nome: 'Lista de Presença', linhas: linhasDaFrequencia() }], 'presencas.xlsx', { omitirLinhasVazias: true });
+    const { abas } = await lerPlanilha(arquivo);
+    const deteccao = detectarFrequencia(abas[0].linhas);
+    afirmar(deteccao, 'não reconheceu a lista de frequência');
+    igual(lerFrequencia(abas[0].linhas, deteccao).pessoas.length, 5);
+  });
+});
+
+grupo('Formato real do sistema oficial', () => {
+  const lerOficial = () => {
+    const linhas = linhasDaListagemOficial();
+    return lerListagem(linhas, detectarListagem(linhas), { hoje: HOJE });
+  };
+
+  teste('o número de inscrição vem com o período colado: separa os dois', () => {
+    igual(lerInscricao('QM05075/2026.1'), { numero: 'QM05075', periodo: '2026.1' });
+    igual(lerInscricao('QM05075'), { numero: 'QM05075', periodo: '' });
+    igual(lerInscricao(' qm05075 / 2025.2 '), { numero: 'qm05075', periodo: '2025.2' });
+  });
+
+  teste('sim/não como 0 e 1 e estado por extenso', () => {
+    igual([lerSimNao(1), lerSimNao(0), lerSimNao('1'), lerSimNao('0'), lerSimNao(2)], [true, false, true, false, null]);
+    igual(lerOpcaoComDetalhe(0, null), { possui: false, qual: '' });
+    igual(lerOpcaoComDetalhe(1, 'Bolsa família'), { possui: true, qual: 'Bolsa família' });
+    igual([lerUf('Rio de Janeiro'), lerUf('rj'), lerUf('São Paulo'), lerUf('Atlântida')], ['RJ', 'RJ', 'SP', 'Atlântida']);
+  });
+
+  teste('acha os títulos técnicos das colunas (candidato_nome, inscricao_id…)', () => {
+    const det = detectarListagem(linhasDaListagemOficial());
+    igual(det.cabecalho, 0);
+    igual([det.colunas.numeroInscricao, det.colunas.nome, det.colunas.deficienciaQual, det.colunas.mcmvQual, det.colunas.dataInscricao, det.colunas.etapaMatricula], [0, 3, 9, 13, 24, 25]);
+    afirmar(detectarFrequencia(linhasDaListagemOficial()) === null);
+  });
+
+  teste('lê as linhas: inscrição, período, perfil em 0/1, datas e estado', () => {
+    const { registros, ignoradas } = lerOficial();
+    igual([registros.length, ignoradas.length], [4, 0]);
+    const maria = registros[0];
+    igual([maria.numeroInscricao, maria.periodo, maria.etapaMatricula, maria.statusExterno], ['QM00001', '2026.1', '7', 'Sorteado']);
+    igual([maria.cpf, maria.dataNascimento, maria.dataInscricao, maria.email, maria.raca], [cpfDe(100000001), '1990-04-12', '2026-02-10', 'maria@exemplo.com', 'PARDA']);
+    igual([maria.deficiencia, maria.programaSocial, maria.mcmv], [{ possui: false, qual: '' }, { possui: true, qual: 'Bolsa família e mumbuca' }, { possui: false, qual: '' }]);
+    igual([registros[1].deficiencia, registros[1].endereco.estado, registros[0].endereco.estado], [{ possui: true, qual: 'Visual' }, 'RJ', 'RJ']);
+  });
+
+  teste('o período da turma vem da inscrição, e é a mesma turma de quem escreve o período no nome do curso', () => {
+    const { registros } = lerOficial();
+    const plano = planejarListagem(registros, NADA, { periodoPadrao: '2099.9', hoje: HOJE });
+    igual(plano.turmas.length, 1);
+    igual(plano.turmas[0].descricao.periodo, '2026.1');
+    igual(plano.turmas[0].nome, '2026.1 - Audiovisual para Mulheres - Sede da Incubadora de Inovação Social em Cultura - Terça, Quarta e Quinta-feira - 18:00 às 21:00');
+    igual(plano.turmas[0].id, planejar().turmas.find((t) => t.descricao.horario.startsWith('Terça')).id, 'o id mudaria conforme a forma de escrever o período');
+    igual(sugerirPeriodo(registros, HOJE), '2026.1');
+  });
+
+  teste('"Inscrito" e "Sorteado" valem como ativa por sugestão, e a escolha da pessoa continua mandando', () => {
+    const { registros } = lerOficial();
+    const plano = planejarListagem(registros, NADA, { periodoPadrao: '2026.1', hoje: HOJE });
+    igual(plano.situacoes.map((s) => [s.rotulo, s.situacao]).sort(), [['Inscrito', 'ativa'], ['Sorteado', 'ativa']]);
+    igual(plano.pendencias, 0);
+    const mudado = planejarListagem(registros, NADA, { periodoPadrao: '2026.1', hoje: HOJE, mapaStatus: { inscrito: 'cancelada' } });
+    igual(mudado.matriculas.filter((m) => m.dados.status === 'cancelada').length, 2);
+  });
+
+  teste('a presença acha a matrícula pelo número SEM o período, mesmo com o mesmo número em dois períodos', () => {
+    const { registros } = lerOficial();
+    const plano = planejarListagem(registros, NADA, { periodoPadrao: '2026.1', hoje: HOJE });
+    const existentes = gravado(plano);
+    // o mesmo número QM00001 também existe numa turma de 2025.2: o período do título decide
+    const antiga = { id: 'tAntiga', nome: '2025.2 - Outro', periodo: '2025.2', cursoId: 'x', cursoNome: 'Outro' };
+    const matriculaAntiga = { id: 'tAntiga_aX', alunoId: 'aX', turmaId: 'tAntiga', numeroInscricao: 'QM00001', status: 'ativa' };
+    const leitura = { turmaTexto: '2026.1 - Audiovisual para Mulheres - Sede - Terça', datas: ['2026-10-05'], avisos: [], pessoas: [{ numeroInscricao: 'QM00001', nome: 'x', marcas: ['P'] }, { numeroInscricao: 'QM00002', nome: 'y', marcas: ['F'] }] };
+    const resolucao = resolverTurmaDaFrequencia(leitura, { matriculas: [...existentes.matriculas, matriculaAntiga], turmas: [...existentes.turmas, antiga] });
+    igual(resolucao.turmaId, existentes.turmas[0].id);
+    igual(resolucao.casadas, 2);
   });
 });

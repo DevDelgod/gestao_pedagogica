@@ -6,8 +6,11 @@
  * desenvolvimento, mostra um botão por conta que preenche e envia o formulário.
  */
 
-/** Mude a versão sempre que alterar a semente: os dados de exemplo salvos no navegador são refeitos. */
-export const SEED_VERSAO = 7;
+/**
+ * Mude a versão sempre que alterar a semente: os dados de exemplo salvos no navegador são descartados (o sistema
+ * volta a abrir vazio; o exemplo só entra se a pessoa pedir, em Importar dados → Carregar dados de exemplo).
+ */
+export const SEED_VERSAO = 8;
 
 export const CONTAS_DEV = [
   {
@@ -56,9 +59,9 @@ export function semear(store, Timestamp) {
   semearEquipe(store, Timestamp);
 
   // --- cursos e turmas ---
-  // modoAvaliacao é só a forma SUGERIDA ao criar uma avaliação ('nota' ou 'apto'): cada avaliação escolhe a sua
+  // modoAvaliacao é a forma do curso ('nota' ou 'apto'), que já vem marcada ao criar uma avaliação; só o curso por nota tem média
   const curso = (id, nome, cargaHoraria, modoAvaliacao = 'nota') =>
-    store.set(`cursos/${id}`, { nome, descricao: '', cargaHoraria, frequenciaMinima: 75, modoAvaliacao, mediaAprovacao: 7, ativo: true, ...auditoria(60) });
+    store.set(`cursos/${id}`, { nome, descricao: '', cargaHoraria, frequenciaMinima: 75, modoAvaliacao, mediaAprovacao: modoAvaliacao === 'nota' ? 7 : null, ativo: true, ...auditoria(60) });
   curso('c1', 'Desenvolvimento Web', 60);
   curso('c2', 'Design Gráfico', 40);
   curso('c3', 'Robótica', 50);

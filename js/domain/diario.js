@@ -6,6 +6,7 @@
  * incrementado), então corrigir ou excluir uma aula antiga acerta os números sozinho.
  */
 import { PRESENCA, STATUS_MATRICULA } from '../models/schema.js';
+import { MAXIMO_MOTIVO } from './faltas.js';
 import { avaliarRiscoEvasao, calcularFrequencia } from './regras.js';
 
 const MARCAS = Object.values(PRESENCA);
@@ -15,7 +16,7 @@ const DATA = /^\d{4}-\d{2}-\d{2}$/;
  * @param {{ data: string, conteudo?: string, registros: Record<string, string> }} entrada
  * @param {{ hoje: string }} contexto `hoje` em 'AAAA-MM-DD' (injetado para a função continuar pura)
  */
-export function validarAula({ data, conteudo, registros }, { hoje }) {
+export function validarAula({ data, conteudo, registros, justificativas }, { hoje }) {
   if (!DATA.test(data ?? '')) return { erro: 'Informe a data da aula.' };
   if (data > hoje) return { erro: 'A aula não pode ser registrada numa data futura.' };
 
@@ -27,7 +28,16 @@ export function validarAula({ data, conteudo, registros }, { hoje }) {
   if (entradas.some(([, marca]) => !MARCAS.includes(marca))) {
     return { erro: 'Marque presença, falta ou falta justificada para todas as pessoas da lista.' };
   }
-  return { dados: { data, conteudo: texto, registros: Object.fromEntries(entradas) } };
+
+  // O motivo da justificativa é opcional e só vale para quem está com falta justificada ('J'); o resto é descartado.
+  const motivos = {};
+  for (const [alunoId, motivo] of Object.entries(justificativas ?? {})) {
+    const t = String(motivo ?? '').trim();
+    if (!t || registros[alunoId] !== PRESENCA.JUSTIFICADA) continue;
+    if (t.length > MAXIMO_MOTIVO) return { erro: `O motivo da justificativa pode ter no máximo ${MAXIMO_MOTIVO} caracteres.` };
+    motivos[alunoId] = t;
+  }
+  return { dados: { data, conteudo: texto, registros: Object.fromEntries(entradas), justificativas: motivos } };
 }
 
 /** Totais de uma chamada: { presentes, faltas, justificadas }. */

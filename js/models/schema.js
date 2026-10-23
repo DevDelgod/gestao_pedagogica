@@ -194,8 +194,8 @@ export const novoCurso = (d) => ({
   descricao: d.descricao ?? '',
   cargaHoraria: d.cargaHoraria ?? 0,
   frequenciaMinima: d.frequenciaMinima ?? 75, // % exigido para aprovação
-  modoAvaliacao: d.modoAvaliacao ?? MODO_AVALIACAO.NOTA, // forma padrão sugerida ao criar uma avaliação: 'nota' ou 'apto' (cada avaliação escolhe a sua)
-  mediaAprovacao: d.mediaAprovacao ?? 7, // na escala 0–10; vale para as avaliações por nota
+  modoAvaliacao: d.modoAvaliacao ?? MODO_AVALIACAO.NOTA, // 'nota' ou 'apto': a forma do curso, que já vem marcada ao criar uma avaliação (cada avaliação escolhe a sua)
+  mediaAprovacao: d.modoAvaliacao === MODO_AVALIACAO.APTO ? null : (d.mediaAprovacao ?? 7), // na escala 0–10; só no curso por nota (Apto / Não apto não tem média)
   ativo: d.ativo ?? true,
 });
 
@@ -317,10 +317,15 @@ export const novaMatricula = (d) => ({
   riscoEvasao: false, // idem
   media: null, // média ponderada atual (0–10) das avaliações por nota; null = ainda sem notas
   aptidao: null, // { avaliadas, aptas, naoAptas } das avaliações Apto / Não apto; null = ainda sem resultados
+  // e-mails de falta (a cada 3 faltas não justificadas): quais já foram enviados, { '3': { em: 'AAAA-MM-DD', por: uid }, '6': … }
+  avisosDeFalta: d.avisosDeFalta ?? {},
+  // até quantas faltas o e-mail de falta já foi tratado (as marcas de 3 acima disso é que ficam pendentes); null = ainda sem marca (ver domain/faltas.js)
+  faltasAvisadas: d.faltasAvisadas ?? null,
   // vindos da importação do sistema oficial
   numeroInscricao: d.numeroInscricao ?? null, // ex.: "QM05075": liga esta matrícula às linhas das planilhas de frequência
   statusExterno: d.statusExterno ?? null, // a situação como o sistema oficial escreve, ex.: "Ativo"
   dataInscricao: d.dataInscricao ?? null, // 'AAAA-MM-DD'
+  etapaMatricula: d.etapaMatricula ?? null, // "etapa_matricula" do sistema oficial, como veio (ex.: "7"); o significado é dele
   origem: d.origem ?? 'manual', // 'manual' | 'importacao'
 });
 
@@ -331,6 +336,7 @@ export const novaAula = (d) => ({
   conteudo: d.conteudo ?? '', // o que foi dado em aula (diário de classe)
   professorId: d.professorId ?? null,
   registros: d.registros ?? {}, // { [alunoId]: 'P' | 'F' | 'J' }
+  justificativas: d.justificativas ?? {}, // { [alunoId]: motivo }: só de quem está com 'J'; o motivo é opcional
   resumo: { presentes: 0, faltas: 0, justificadas: 0 },
 });
 

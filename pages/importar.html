@@ -23,29 +23,57 @@
           <h2>Dados neste navegador</h2>
           <p id="dados-texto"></p>
           <p class="item__meta" id="dados-contagem"></p>
+          <p class="item__meta" id="dados-endereco"></p>
           <div class="item__acoes">
             <button class="botao botao--fantasma" type="button" id="btn-backup">Baixar backup</button>
             <button class="botao botao--fantasma" type="button" id="btn-restaurar">Restaurar backup…</button>
             <button class="botao botao--fantasma" type="button" id="btn-limpar">Limpar dados de exemplo</button>
+            <button class="botao botao--fantasma" type="button" id="btn-exemplos" hidden>Carregar dados de exemplo</button>
             <input type="file" id="arq-backup" accept=".json,application/json" hidden />
           </div>
         </section>
 
-        <section class="cartao bloco">
-          <h2>Nova importação</h2>
-          <p class="item__meta">
-            Dois tipos de planilha, em .xlsx ou .csv. A <strong>Listagem</strong> de candidatos (Exportar Listagem) cria as pessoas, as matrículas e as
-            turmas. A <strong>lista de frequência</strong> de uma turma (com uma coluna por aula) registra as presenças e faltas; importe a listagem antes.
-          </p>
-          <label class="area-arquivo" id="area-arquivo" for="arquivo">
-            <strong>Escolha o arquivo</strong> ou arraste-o até aqui
-            <span class="item__meta">Nada sai do seu computador: a planilha é lida aqui mesmo, no navegador.</span>
-          </label>
-          <input type="file" id="arquivo" accept=".xlsx,.csv,.txt" hidden />
-          <p class="aviso" id="erro-arquivo" role="alert" hidden></p>
-        </section>
+        <div class="analise-grade">
+          <section class="cartao bloco" aria-labelledby="titulo-matriculas">
+            <h2 id="titulo-matriculas">1. Matrículas</h2>
+            <p class="item__meta">
+              A <strong>Listagem</strong> de candidatos (Exportar Listagem). Cria as pessoas, as matrículas e as turmas. Envie primeiro.
+            </p>
+            <label class="area-arquivo" id="area-matriculas" for="arq-matriculas">
+              <strong>Escolha a listagem</strong> ou arraste-a até aqui
+              <span class="item__meta">.xlsx ou .csv</span>
+            </label>
+            <input type="file" id="arq-matriculas" accept=".xlsx,.csv,.txt" hidden />
+            <p class="aviso" id="erro-matriculas" role="alert" hidden></p>
+          </section>
+
+          <section class="cartao bloco" aria-labelledby="titulo-presencas">
+            <h2 id="titulo-presencas">2. Presenças e faltas</h2>
+            <p class="item__meta">
+              A <strong>lista de frequência</strong> de cada turma (uma coluna por aula). Pode enviar várias de uma vez. Cada presença encontra a sua
+              matrícula pelo <strong>número de inscrição</strong>, por isso a listagem vem antes.
+            </p>
+            <label class="area-arquivo" id="area-presencas" for="arq-presencas">
+              <strong>Escolha as listas de frequência</strong> ou arraste-as até aqui
+              <span class="item__meta">.xlsx ou .csv, uma ou várias</span>
+            </label>
+            <input type="file" id="arq-presencas" accept=".xlsx,.csv,.txt" multiple hidden />
+            <p class="aviso" id="erro-presencas" role="alert" hidden></p>
+          </section>
+        </div>
+        <p class="item__meta" style="margin: calc(var(--espaco-2) * -1) 0 var(--espaco-4)">Nada sai do seu computador: as planilhas são lidas aqui mesmo, no navegador.</p>
 
         <section id="previa" aria-live="polite" hidden></section>
+
+        <section class="cartao bloco" id="cartao-turmas" hidden>
+          <div class="bloco__topo">
+            <div>
+              <h2>Turmas e presenças</h2>
+              <p class="item__meta" id="turmas-resumo"></p>
+            </div>
+          </div>
+          <div class="tabela-rolagem" id="turmas-tabela"></div>
+        </section>
 
         <h2 class="subtitulo">Importações feitas</h2>
         <section class="lista" id="historico" aria-live="polite"></section>

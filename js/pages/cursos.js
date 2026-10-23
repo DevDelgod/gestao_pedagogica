@@ -25,9 +25,14 @@ $('#cu-modo').innerHTML = Object.values(MODO_AVALIACAO)
   .map((modo) => `<option value="${modo}">${escapar(ROTULO_MODO_AVALIACAO[modo])}</option>`)
   .join('');
 
-/** A forma de avaliar do curso é só a sugestão ao criar uma avaliação: explica a forma escolhida e lembra disso. */
+/**
+ * Explica a forma de avaliar escolhida e só pede a média de aprovação quando o curso avalia por nota: num curso
+ * Apto / Não apto não existe média. A forma do curso é a sugestão ao criar uma avaliação (cada avaliação escolhe a sua).
+ */
 function atualizarModo() {
-  $('#cu-modo-ajuda').textContent = `${AJUDA_MODO_AVALIACAO[$('#cu-modo').value]} É só a sugestão ao criar uma avaliação: cada avaliação escolhe a sua.`;
+  const modo = $('#cu-modo').value;
+  $('#cu-modo-ajuda').textContent = `${AJUDA_MODO_AVALIACAO[modo]} Ao criar uma avaliação, esta forma já vem marcada.`;
+  $('#cu-media-campo').hidden = modo !== MODO_AVALIACAO.NOTA;
 }
 $('#cu-modo').addEventListener('change', atualizarModo);
 
@@ -65,11 +70,12 @@ function renderizar() {
 
 function cursoHtml(c) {
   const turmas = estado.turmasPorCurso.get(c.id) ?? 0;
+  const porNota = modoDoCurso(c) === MODO_AVALIACAO.NOTA;
   const detalhes = [
     c.cargaHoraria ? `${c.cargaHoraria} h` : null,
     `frequência mínima ${c.frequenciaMinima}%`,
-    `média ${String(c.mediaAprovacao ?? 7).replace('.', ',')}`,
-    `avaliação sugerida: ${ROTULO_MODO_AVALIACAO[modoDoCurso(c)]}`,
+    `avaliação: ${ROTULO_MODO_AVALIACAO[modoDoCurso(c)]}`,
+    porNota ? `média ${String(c.mediaAprovacao ?? 7).replace('.', ',')}` : null, // curso Apto / Não apto não tem média
   ].filter(Boolean);
 
   return `

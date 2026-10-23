@@ -18,6 +18,17 @@ grupo('Análises: contar e filtrar', () => {
     igual(distribuir(['BPC', 'bpc', 'CRAS']).map((i) => i.rotulo), ['BPC', 'CRAS']);
   });
 
+  teste('programas sociais escritos de jeitos diferentes viram uma entrada por programa', () => {
+    const pessoas = [
+      { id: 'a', dataNascimento: null, programaSocial: { possui: true, qual: 'Bolsa família e mumbuca ' } },
+      { id: 'b', dataNascimento: null, programaSocial: { possui: true, qual: 'Bolsa  família,  mumbuca' } },
+      { id: 'c', dataNascimento: null, programaSocial: { possui: true, qual: 'Mumbuca' } },
+    ];
+    const linhas = pessoas.map((aluno) => ({ m: { alunoId: aluno.id }, aluno, turma: {}, curso: null }));
+    const p = perfil(linhas, { hoje: HOJE });
+    igual(p.programaSocialQual.map((i) => [i.rotulo, i.quantidade]), [['Mumbuca', 3], ['Bolsa família', 2]]);
+  });
+
   teste('o limite junta o resto em "Outros"', () => {
     const itens = distribuir(['a', 'a', 'a', 'b', 'b', 'c', 'd'], { limite: 2 });
     igual(itens.map((i) => [i.rotulo, i.quantidade]), [['A', 3], ['B', 2], ['Outros (2)', 2]]);

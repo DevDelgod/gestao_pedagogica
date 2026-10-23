@@ -91,10 +91,12 @@ const serialDe = (iso) => Math.round((Date.UTC(...iso.split('-').map((n, i) => (
 /**
  * Um .xlsx com as abas dadas. Em cada célula: texto, número, true/false, null (vazia) ou { data: 'AAAA-MM-DD' }
  * (célula numérica com formato de data, como o Excel grava).
+ * `omitirLinhasVazias`: não escreve as linhas sem nenhuma célula, como o Excel de verdade faz (a planilha fica com
+ * "buracos" nos números das linhas).
  * @param {Array<{ nome: string, linhas: unknown[][] }>} abas
  * @returns {Promise<File>}
  */
-export async function criarXlsx(abas, nomeDoArquivo = 'planilha.xlsx') {
+export async function criarXlsx(abas, nomeDoArquivo = 'planilha.xlsx', { omitirLinhasVazias = false } = {}) {
   const textos = [];
   const indiceDe = (t) => {
     const i = textos.indexOf(t);
@@ -112,7 +114,7 @@ export async function criarXlsx(abas, nomeDoArquivo = 'planilha.xlsx') {
           return `<c r="${ref}" t="s"><v>${indiceDe(String(valor))}</v></c>`;
         })
         .join('');
-      return `<row r="${i + 1}">${celulas}</row>`;
+      return omitirLinhasVazias && !celulas ? '' : `<row r="${i + 1}">${celulas}</row>`;
     });
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${xmlLinhas.join('')}</sheetData></worksheet>`;
   });
@@ -202,6 +204,35 @@ export function linhasDaListagem() {
     linhaListagem({ ...tarde, inscricao: 'QM00007', id: 9007, nome: 'PAULA SIMULADA REIS', email: 'paula@exemplo.com', cpf: cpfDe(100000007), nascimento: '14/05/1988', raca: 'Indígena', deficiencia: 'Não', programa: 'Não', mcmv: 'Não', situacao: 'Desistente' }),
     // a mesma pessoa da primeira linha, agora inscrita também na turma da tarde (mesmo Id do candidato)
     linhaListagem({ ...tarde, inscricao: 'QM00008', id: 9001, nome: 'MARIA DAS GRAÇAS EXEMPLO', email: 'maria@exemplo.com', cpf: cpfDe(100000001), nascimento: '12/04/1990', raca: 'Parda', deficiencia: 'Não', programa: 'Sim', programaQual: 'Bolsa Família', mcmv: 'Não' }),
+  ];
+}
+
+/**
+ * A listagem COMO O SISTEMA OFICIAL DE FATO EXPORTA (conferido num arquivo real, com dados inventados aqui): nomes
+ * técnicos de coluna, "inscricao_id" com o período colado ("QM00001/2026.1"), sim/não como 0 e 1, curso sem período,
+ * situações da seleção ("Inscrito", "Sorteado"), datas "dd/mm/aaaa" e "aaaa-mm-dd hh:mm:ss".
+ */
+export const CABECALHO_OFICIAL = [
+  'inscricao_id', 'candidato_id', 'status_candidato', 'candidato_nome', 'candidato_email', 'candidato_cpf', 'candidato_data_nasc', 'candidato_raca',
+  'candidato_deficiencia', 'candidato_deficiencia_nome', 'candidato_programa_social', 'candidato_programa_social_nome', 'candidato_mcmv',
+  'candidato_mcmv_local', 'candidato_telefone', 'candidato_whatsapp', 'candidato_cep', 'candidato_rua', 'candidato_bairro', 'candidato_cidade',
+  'candidato_estado', 'polo', 'curso', 'horario', 'data_inscricao', 'etapa_matricula',
+];
+
+const comMascara = (cpf) => cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+
+export function linhasDaListagemOficial() {
+  const turma = ['Sede da Incubadora de Inovação Social em Cultura', 'Audiovisual para Mulheres', HORARIO_NOITE];
+  const pessoa = (o) => [
+    o.inscricao, o.id, o.status, o.nome, o.email, comMascara(o.cpf), o.nascimento, o.raca, o.deficiencia, o.deficienciaNome ?? null, o.programa, o.programaNome ?? null,
+    0, null, '(21) 3000-0000', '(21) 90000-0000', '20000-000', 'Rua das Flores', 'Centro', 'Rio de Janeiro', o.estado, ...turma, '2026-02-10 14:35:00', o.etapa,
+  ];
+  return [
+    CABECALHO_OFICIAL,
+    pessoa({ inscricao: 'QM00001/2026.1', id: 9001, status: 'Sorteado', nome: 'MARIA DAS GRAÇAS EXEMPLO', email: 'Maria@Exemplo.com', cpf: cpfDe(100000001), nascimento: '12/04/1990', raca: 'PARDA', deficiencia: 0, programa: 1, programaNome: 'Bolsa família e mumbuca ', estado: 'RJ', etapa: 7 }),
+    pessoa({ inscricao: 'QM00002/2026.1', id: 9002, status: 'Inscrito', nome: 'JOANA EXEMPLAR DA SILVA', email: 'joana@exemplo.com', cpf: cpfDe(100000002), nascimento: '03/11/1985', raca: 'NEGRO', deficiencia: 1, deficienciaNome: 'Visual', programa: 0, estado: 'Rio de Janeiro', etapa: 7 }),
+    pessoa({ inscricao: 'QM00003/2026.1', id: 9003, status: 'Sorteado', nome: 'ANA FICTÍCIA PEREIRA', email: 'ana@exemplo.com', cpf: cpfDe(100000003), nascimento: '25/07/2001', raca: 'BRANCO', deficiencia: 0, programa: 0, estado: 'RJ', etapa: 1 }),
+    pessoa({ inscricao: 'QM00004/2026.1', id: 9004, status: 'Inscrito', nome: 'LUCIA DE TESTE MOURA', email: 'lucia@exemplo.com', cpf: cpfDe(100000004), nascimento: '30/01/1978', raca: 'PARDO', deficiencia: 0, programa: 1, programaNome: 'Bolsa  família,  mumbuca', estado: 'RJ', etapa: 7 }),
   ];
 }
 

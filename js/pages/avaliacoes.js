@@ -91,7 +91,7 @@ async function iniciar() {
       $('#a-aviso'),
       ehProfessor
         ? 'Você ainda não tem turmas atribuídas. A coordenação define o professor de cada turma na tela Turmas.'
-        : 'Nenhuma turma cadastrada ainda. Crie uma na tela Turmas.',
+        : 'Nenhuma turma ainda. Importe as matrículas em "Importar dados" ou crie uma na tela Turmas.',
     );
   }
 
