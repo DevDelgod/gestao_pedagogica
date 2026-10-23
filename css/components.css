@@ -698,6 +698,28 @@ a.botao {
   color: var(--cor-atencao);
 }
 
+/* ---------- avaliações: lançamento de notas e de Apto / Não apto ---------- */
+.marca--texto {
+  min-width: 92px;
+  padding: 0 var(--espaco-3);
+}
+
+.nota-campo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.nota-campo .entrada-pequena {
+  min-height: 44px;
+  text-align: right;
+}
+
+.entrada-pequena[aria-invalid='true'] {
+  border-color: var(--cor-erro);
+  background: var(--cor-erro-fundo);
+}
+
 /* seções dentro de um diálogo longo (ficha do aluno) */
 .secao-ficha {
   margin-top: var(--espaco-5);

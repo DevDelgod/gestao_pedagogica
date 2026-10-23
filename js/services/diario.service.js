@@ -12,7 +12,7 @@ import { ErroDeNegocio } from '../core/erros.js';
 import { hojeISO } from '../core/datas.js';
 import { recalcularMatriculas, resumoDaChamada, validarAula } from '../domain/diario.js';
 import { COLECOES, STATUS_MATRICULA, STATUS_TURMA, idAula, novaAula } from '../models/schema.js';
-import { matriculasRepo } from './matriculas.service.js';
+import { listarMatriculasDaTurma } from './matriculas.service.js';
 
 export const aulasRepo = criarRepo(COLECOES.AULAS);
 
@@ -21,8 +21,6 @@ export async function listarAulasDaTurma(turmaId) {
   const aulas = await aulasRepo.listar(where('turmaId', '==', turmaId));
   return aulas.sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
 }
-
-export const listarMatriculasDaTurma = (turmaId) => matriculasRepo.listar(where('turmaId', '==', turmaId));
 
 /**
  * Grava (ou corrige) a chamada de uma data.

@@ -3,7 +3,7 @@
  * Cada uma devolve { dados } (já limpos e com os tipos certos) ou { erro } (mensagem pronta para a tela).
  * Aceitam os valores crus de um formulário: números e datas chegam como texto.
  */
-import { DIAS_SEMANA, STATUS_TURMA } from '../models/schema.js';
+import { DIAS_SEMANA, MODO_AVALIACAO, STATUS_TURMA } from '../models/schema.js';
 import { validarGenero, validarNomeSocial } from './pessoa.js';
 
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -23,13 +23,17 @@ export function validarCurso(entrada) {
   const frequenciaMinima = numero(entrada.frequenciaMinima, 75);
   if (!(frequenciaMinima >= 0 && frequenciaMinima <= 100)) return { erro: 'A frequência mínima deve estar entre 0 e 100%.' };
 
+  // forma de avaliar sugerida ao criar uma avaliação; cada avaliação escolhe a sua
+  const modoAvaliacao = entrada.modoAvaliacao ?? MODO_AVALIACAO.NOTA;
+  if (!Object.values(MODO_AVALIACAO).includes(modoAvaliacao)) return { erro: 'Forma de avaliar inválida.' };
+
   const mediaAprovacao = numero(entrada.mediaAprovacao, 7);
   if (!(mediaAprovacao >= 0 && mediaAprovacao <= 10)) return { erro: 'A média de aprovação deve estar entre 0 e 10.' };
 
   const descricao = texto(entrada.descricao);
   if (descricao.length > 1000) return { erro: 'A descrição pode ter no máximo 1000 caracteres.' };
 
-  return { dados: { nome, descricao, cargaHoraria, frequenciaMinima, mediaAprovacao, ativo: entrada.ativo ?? true } };
+  return { dados: { nome, descricao, cargaHoraria, frequenciaMinima, modoAvaliacao, mediaAprovacao, ativo: entrada.ativo ?? true } };
 }
 
 /** CPF com dígitos verificadores (só os 11 dígitos, sem máscara). */

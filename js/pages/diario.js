@@ -4,10 +4,11 @@ import { $, $$, confirmar, escapar, toast } from '../core/ui.js';
 import { formatarData, formatarDataHora, hojeISO } from '../core/datas.js';
 import { ErroDeNegocio } from '../core/erros.js';
 import { pessoasDaChamada, resumoDaChamada } from '../domain/diario.js';
-import { DIAS_SEMANA, PAPEIS, PRESENCA, STATUS_MATRICULA, STATUS_TURMA } from '../models/schema.js';
+import { DIAS_SEMANA, PAPEIS, PRESENCA, STATUS_MATRICULA } from '../models/schema.js';
 import { ROTULO_DIA, ROTULO_STATUS_MATRICULA, ROTULO_STATUS_TURMA } from '../models/rotulos.js';
-import { excluirAula, listarAulasDaTurma, listarMatriculasDaTurma, registrarAula } from '../services/diario.service.js';
-import { turmasRepo } from '../services/turmas.service.js';
+import { excluirAula, listarAulasDaTurma, registrarAula } from '../services/diario.service.js';
+import { listarMatriculasDaTurma } from '../services/matriculas.service.js';
+import { listarTurmasDeTrabalho } from '../services/turmas.service.js';
 
 // Professor, coordenação e admin usam o diário. O professor só vê as turmas dele.
 const eu = await exigirLogin();
@@ -67,14 +68,9 @@ async function podeDescartar() {
 // ---------------------------------------------------------------------------
 // Carregamento
 // ---------------------------------------------------------------------------
-const ORDEM_STATUS = { [STATUS_TURMA.EM_ANDAMENTO]: 0, [STATUS_TURMA.ABERTA]: 1, [STATUS_TURMA.PLANEJADA]: 2, [STATUS_TURMA.ENCERRADA]: 3 };
-
 async function iniciar() {
   try {
-    const todas = await turmasRepo.listar();
-    estado.turmas = todas
-      .filter((t) => t.status !== STATUS_TURMA.CANCELADA && (!ehProfessor || t.professorId === eu.uid))
-      .sort((a, b) => (ORDEM_STATUS[a.status] ?? 9) - (ORDEM_STATUS[b.status] ?? 9) || a.nome.localeCompare(b.nome, 'pt-BR'));
+    estado.turmas = await listarTurmasDeTrabalho({ professorId: ehProfessor ? eu.uid : null });
   } catch (erro) {
     console.error(erro);
     return mostrar($('#d-aviso'), 'Não foi possível carregar as turmas. Confira a configuração do Firebase e as regras do Firestore.');

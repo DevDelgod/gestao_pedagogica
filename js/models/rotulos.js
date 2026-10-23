@@ -95,6 +95,37 @@ export const ROTULO_DIA = Object.freeze({
   sab: 'Sábado',
 });
 
+export const ROTULO_MODO_AVALIACAO = Object.freeze({
+  nota: 'Nota numérica',
+  apto: 'Apto / Não apto',
+});
+
+export const AJUDA_MODO_AVALIACAO = Object.freeze({
+  nota: 'Cada pessoa recebe uma nota. As notas entram na média ponderada, que precisa alcançar a média de aprovação do curso.',
+  apto: 'Cada pessoa recebe Apto ou Não apto, sem número. A pessoa precisa estar apta nas avaliações deste tipo.',
+});
+
+export const ROTULO_TIPO_AVALIACAO = Object.freeze({
+  prova: 'Prova',
+  trabalho: 'Trabalho',
+  projeto: 'Projeto',
+  participacao: 'Participação',
+});
+
+const virgula = (n) => String(n).replace('.', ',');
+
+/**
+ * Desempenho de uma matrícula em uma frase curta: "Média 7,4", "Apto em 2 de 3 avaliações" ou as duas juntas
+ * ("Média 7,4 · Apto em 2 de 3 avaliações"), conforme as formas de avaliar usadas na turma. Vazio se ainda não há resultados.
+ */
+export function textoDesempenho(matricula) {
+  const partes = [];
+  if (typeof matricula.media === 'number') partes.push(`Média ${virgula(matricula.media)}`);
+  const a = matricula.aptidao;
+  if (a?.avaliadas) partes.push(`Apto em ${a.aptas} de ${a.avaliadas} avaliação(ões)`);
+  return partes.join(' · ');
+}
+
 export const ROTULO_TIPO_REQUISITO = Object.freeze({
   documento: 'Documento',
   pagamento: 'Pagamento',

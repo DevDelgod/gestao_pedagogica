@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Avaliações · FUDEV</title>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <noscript><style>body[data-auth] { visibility: visible; }</style></noscript>
+  </head>
+  <body data-auth="pending">
+    <div class="app">
+      <aside class="sidebar" id="sidebar"></aside>
+
+      <main class="principal">
+        <header class="topo topo--acao">
+          <div>
+            <h1>Avaliações</h1>
+            <p class="topo__sub">Crie as avaliações da turma, escolha se cada uma vale nota ou Apto / Não apto e lance os resultados.</p>
+          </div>
+          <button class="botao" type="button" id="btn-nova" disabled>Nova avaliação</button>
+        </header>
+
+        <div class="barra">
+          <div class="campo">
+            <label for="a-turma">Turma</label>
+            <select id="a-turma"></select>
+          </div>
+        </div>
+
+        <p class="aviso" id="a-aviso" role="alert" hidden></p>
+        <p class="aviso aviso--info" id="a-modo" hidden></p>
+
+        <section class="lista" id="avaliacoes" aria-live="polite"></section>
+
+        <section class="cartao" id="lancamento" hidden>
+          <header class="chamada__topo">
+            <div>
+              <h2 id="lanc-titulo"></h2>
+              <p class="item__meta" id="lanc-sub"></p>
+            </div>
+            <div class="item__acoes">
+              <button class="botao botao--fantasma" type="button" id="btn-todos-aptos">Marcar todos Apto</button>
+              <button class="botao botao--fantasma" type="button" id="btn-limpar">Limpar resultados</button>
+            </div>
+          </header>
+
+          <p class="item__meta" id="lanc-totais"></p>
+          <ul class="chamada" id="lanc-lista"></ul>
+
+          <p class="aviso" id="lanc-erro" role="alert" hidden></p>
+          <div class="item__acoes">
+            <button class="botao" type="button" id="btn-salvar">Salvar resultados</button>
+            <button class="botao botao--fantasma" type="button" id="btn-fechar">Fechar</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="dialogo dialogo--largo" id="dlg-avaliacao" aria-labelledby="av-titulo-dlg">
+      <form id="form-avaliacao" novalidate>
+        <h2 id="av-titulo-dlg">Nova avaliação</h2>
+        <p class="dialogo__sub" id="av-modo-info"></p>
+
+        <p class="aviso" id="av-erro" role="alert" hidden></p>
+
+        <div class="campo">
+          <label for="av-titulo">Título</label>
+          <input id="av-titulo" maxlength="120" placeholder="Ex.: Prova 1 — HTML e CSS" autocomplete="off" />
+        </div>
+
+        <fieldset class="campo">
+          <legend>Forma de avaliar</legend>
+          <div class="opcoes opcoes--linha" id="av-modos"></div>
+          <span class="campo__ajuda" id="av-modo-ajuda"></span>
+        </fieldset>
+
+        <div class="grade-2">
+          <div class="campo">
+            <label for="av-tipo">Tipo</label>
+            <select id="av-tipo"></select>
+          </div>
+          <div class="campo">
+            <label for="av-data">Data (opcional)</label>
+            <input id="av-data" type="date" />
+          </div>
+        </div>
+
+        <div class="grade-2" id="av-campos-nota">
+          <div class="campo">
+            <label for="av-peso">Peso</label>
+            <input id="av-peso" type="number" min="0.1" max="100" step="0.1" />
+            <span class="campo__ajuda">Quanto esta avaliação conta na média.</span>
+          </div>
+          <div class="campo">
+            <label for="av-max">Nota máxima</label>
+            <input id="av-max" type="number" min="1" max="100" step="0.5" />
+            <span class="campo__ajuda">Normalmente 10. Na média, as notas são convertidas para a escala de 0 a 10.</span>
+          </div>
+        </div>
+
+        <div class="dialogo__acoes">
+          <button class="botao botao--fantasma" type="button" data-fechar>Cancelar</button>
+          <button class="botao" type="submit" id="av-salvar">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="../js/pages/avaliacoes.js"></script>
+  </body>
+</html>

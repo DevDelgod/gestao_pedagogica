@@ -23,6 +23,19 @@ export async function listarTurmasOfertaveis() {
   return turmas.filter(aceitaMatricula).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
+const ORDEM_STATUS = { [STATUS_TURMA.EM_ANDAMENTO]: 0, [STATUS_TURMA.ABERTA]: 1, [STATUS_TURMA.PLANEJADA]: 2, [STATUS_TURMA.ENCERRADA]: 3 };
+
+/**
+ * Turmas onde se lança chamada e notas (Diário de classe, Avaliações): as não canceladas, as em andamento
+ * primeiro. Com `professorId`, só as que essa pessoa leciona.
+ */
+export async function listarTurmasDeTrabalho({ professorId = null } = {}) {
+  const turmas = await turmasRepo.listar();
+  return turmas
+    .filter((t) => t.status !== STATUS_TURMA.CANCELADA && (!professorId || t.professorId === professorId))
+    .sort((a, b) => (ORDEM_STATUS[a.status] ?? 9) - (ORDEM_STATUS[b.status] ?? 9) || a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
 /** Todas as turmas, as mais recentes primeiro. */
 export async function listarTurmas() {
   const turmas = await turmasRepo.listar();

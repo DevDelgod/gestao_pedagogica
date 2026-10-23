@@ -32,22 +32,32 @@ Write-Host "Servindo $Raiz em http://localhost:$Porta/  (Ctrl+C para parar)"
 try {
   while ($http.IsListening) {
     $ctx = $http.GetContext()
-    $caminho = [Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath).TrimStart('/')
-    if ($caminho -eq '' -or $caminho.EndsWith('/')) { $caminho += 'index.html' }
+    # Um erro numa requisição (navegador que desistiu, pedido HEAD…) não pode derrubar o servidor inteiro.
+    try {
+      $caminho = [Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath).TrimStart('/')
+      if ($caminho -eq '' -or $caminho.EndsWith('/')) { $caminho += 'index.html' }
 
-    # GetFullPath resolve ".." — só entrega arquivo que esteja dentro da raiz do projeto
-    $arquivo = [System.IO.Path]::GetFullPath((Join-Path $Raiz $caminho))
-    if ($arquivo.StartsWith($Raiz) -and (Test-Path -LiteralPath $arquivo -PathType Leaf)) {
-      $ext = [System.IO.Path]::GetExtension($arquivo).ToLower()
-      $ctx.Response.ContentType = if ($tipos.ContainsKey($ext)) { $tipos[$ext] } else { 'application/octet-stream' }
-      $ctx.Response.Headers.Add('Cache-Control', 'no-store')
-      $bytes = [System.IO.File]::ReadAllBytes($arquivo)
-      $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length)
+      # GetFullPath resolve ".." — só entrega arquivo que esteja dentro da raiz do projeto
+      $arquivo = [System.IO.Path]::GetFullPath((Join-Path $Raiz $caminho))
+      if ($arquivo.StartsWith($Raiz) -and (Test-Path -LiteralPath $arquivo -PathType Leaf)) {
+        $ext = [System.IO.Path]::GetExtension($arquivo).ToLower()
+        $ctx.Response.ContentType = if ($tipos.ContainsKey($ext)) { $tipos[$ext] } else { 'application/octet-stream' }
+        $ctx.Response.Headers.Add('Cache-Control', 'no-store')
+        $bytes = [System.IO.File]::ReadAllBytes($arquivo)
+        $ctx.Response.ContentLength64 = $bytes.Length
+        # HEAD pede só os cabeçalhos: escrever o corpo seria um erro de protocolo
+        if ($ctx.Request.HttpMethod -ne 'HEAD') { $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length) }
+      }
+      else {
+        $ctx.Response.StatusCode = 404
+      }
     }
-    else {
-      $ctx.Response.StatusCode = 404
+    catch {
+      Write-Host "Falha ao responder $($ctx.Request.Url.AbsolutePath): $($_.Exception.Message)"
     }
-    $ctx.Response.Close()
+    finally {
+      $ctx.Response.Close()
+    }
   }
 }
 finally {

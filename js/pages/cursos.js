@@ -2,7 +2,9 @@ import { exigirLogin } from '../core/auth.js';
 import { montarShell } from '../components/shell.js';
 import { $, $$, confirmar, escapar, toast } from '../core/ui.js';
 import { ErroDeNegocio } from '../core/erros.js';
-import { PAPEIS } from '../models/schema.js';
+import { modoDoCurso } from '../domain/avaliacoes.js';
+import { MODO_AVALIACAO, PAPEIS } from '../models/schema.js';
+import { AJUDA_MODO_AVALIACAO, ROTULO_MODO_AVALIACAO } from '../models/rotulos.js';
 import { definirCursoAtivo, listarCursos, salvarCurso } from '../services/cursos.service.js';
 import { turmasRepo } from '../services/turmas.service.js';
 
@@ -18,6 +20,16 @@ const estado = {
   turmasPorCurso: new Map(), // cursoId → quantidade de turmas
   editandoId: null, // null = novo curso
 };
+
+$('#cu-modo').innerHTML = Object.values(MODO_AVALIACAO)
+  .map((modo) => `<option value="${modo}">${escapar(ROTULO_MODO_AVALIACAO[modo])}</option>`)
+  .join('');
+
+/** A forma de avaliar do curso é só a sugestão ao criar uma avaliação: explica a forma escolhida e lembra disso. */
+function atualizarModo() {
+  $('#cu-modo-ajuda').textContent = `${AJUDA_MODO_AVALIACAO[$('#cu-modo').value]} É só a sugestão ao criar uma avaliação: cada avaliação escolhe a sua.`;
+}
+$('#cu-modo').addEventListener('change', atualizarModo);
 
 const mostrarErro = (texto) => {
   caixaErro.textContent = texto;
@@ -56,7 +68,8 @@ function cursoHtml(c) {
   const detalhes = [
     c.cargaHoraria ? `${c.cargaHoraria} h` : null,
     `frequência mínima ${c.frequenciaMinima}%`,
-    `média ${String(c.mediaAprovacao).replace('.', ',')}`,
+    `média ${String(c.mediaAprovacao ?? 7).replace('.', ',')}`,
+    `avaliação sugerida: ${ROTULO_MODO_AVALIACAO[modoDoCurso(c)]}`,
   ].filter(Boolean);
 
   return `
@@ -114,8 +127,10 @@ function abrirFormulario(curso = null) {
   $('#cu-descricao').value = curso?.descricao ?? '';
   $('#cu-carga').value = curso?.cargaHoraria ?? '';
   $('#cu-frequencia').value = curso?.frequenciaMinima ?? 75;
+  $('#cu-modo').value = curso ? modoDoCurso(curso) : MODO_AVALIACAO.NOTA;
   $('#cu-media').value = curso?.mediaAprovacao ?? 7;
   $('#cu-ativo').checked = curso?.ativo ?? true;
+  atualizarModo();
 
   const turmas = curso ? (estado.turmasPorCurso.get(curso.id) ?? 0) : 0;
   const aviso = $('#curso-aviso-turmas');
@@ -140,6 +155,7 @@ $('#form-curso').addEventListener('submit', async (evento) => {
       descricao: $('#cu-descricao').value,
       cargaHoraria: $('#cu-carga').value,
       frequenciaMinima: $('#cu-frequencia').value,
+      modoAvaliacao: $('#cu-modo').value,
       mediaAprovacao: $('#cu-media').value,
       ativo: $('#cu-ativo').checked,
     });

@@ -130,6 +130,18 @@ export const TIPO_AVALIACAO = Object.freeze({
   PARTICIPACAO: 'participacao',
 });
 
+/**
+ * Como uma avaliação avalia (escolhido em cada avaliação, ao criá-la; avaliacoes.modo):
+ *  - nota: cada pessoa recebe uma nota (de 0 até a nota máxima, normalmente 10); a média ponderada das notas
+ *    precisa alcançar cursos.mediaAprovacao;
+ *  - apto: cada pessoa recebe Apto ou Não apto, sem número.
+ * O curso só sugere a forma padrão (cursos.modoAvaliacao); as duas convivem na mesma turma.
+ */
+export const MODO_AVALIACAO = Object.freeze({
+  NOTA: 'nota',
+  APTO: 'apto',
+});
+
 /** Ordem de Date#getDay(): domingo = 0. */
 export const DIAS_SEMANA = Object.freeze(['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab']);
 
@@ -180,7 +192,8 @@ export const novoCurso = (d) => ({
   descricao: d.descricao ?? '',
   cargaHoraria: d.cargaHoraria ?? 0,
   frequenciaMinima: d.frequenciaMinima ?? 75, // % exigido para aprovação
-  mediaAprovacao: d.mediaAprovacao ?? 7, // na escala 0–10
+  modoAvaliacao: d.modoAvaliacao ?? MODO_AVALIACAO.NOTA, // forma padrão sugerida ao criar uma avaliação: 'nota' ou 'apto' (cada avaliação escolhe a sua)
+  mediaAprovacao: d.mediaAprovacao ?? 7, // na escala 0–10; vale para as avaliações por nota
   ativo: d.ativo ?? true,
 });
 
@@ -287,7 +300,8 @@ export const novaMatricula = (d) => ({
   status: d.status ?? STATUS_MATRICULA.ATIVA,
   frequencia: frequenciaInicial(), // recalculado a cada chamada (js/domain/regras.js)
   riscoEvasao: false, // idem
-  media: null, // média ponderada atual; null = ainda sem notas
+  media: null, // média ponderada atual (0–10) das avaliações por nota; null = ainda sem notas
+  aptidao: null, // { avaliadas, aptas, naoAptas } das avaliações Apto / Não apto; null = ainda sem resultados
 });
 
 /** aulas/{turmaId_data} — uma chamada inteira cabe em UM documento. */
@@ -300,13 +314,24 @@ export const novaAula = (d) => ({
   resumo: { presentes: 0, faltas: 0, justificadas: 0 },
 });
 
-/** avaliacoes/{avaliacaoId} — uma avaliação da turma + as notas de todos. */
-export const novaAvaliacao = (d) => ({
-  turmaId: d.turmaId,
-  titulo: d.titulo,
-  tipo: d.tipo ?? TIPO_AVALIACAO.PROVA,
-  data: d.data ?? null, // 'AAAA-MM-DD'
-  peso: d.peso ?? 1,
-  notaMaxima: d.notaMaxima ?? 10,
-  notas: d.notas ?? {}, // { [alunoId]: number } — ausente = ainda não lançada
-});
+/**
+ * avaliacoes/{avaliacaoId} — uma avaliação da turma + os resultados de todos num único documento.
+ * A forma de avaliar (modo) é escolhida ao criar a avaliação: só o mapa do modo é usado (`notas` no modo
+ * 'nota', `aptos` no modo 'apto'); o outro fica vazio, o que permite trocar de modo enquanto não há resultados.
+ * Quem não aparece no mapa de resultados ainda não foi avaliado (não é zero nem "não apto").
+ */
+export const novaAvaliacao = (d) => {
+  const modo = d.modo ?? MODO_AVALIACAO.NOTA;
+  const nota = modo === MODO_AVALIACAO.NOTA;
+  return {
+    turmaId: d.turmaId,
+    modo,
+    titulo: d.titulo,
+    tipo: d.tipo ?? TIPO_AVALIACAO.PROVA,
+    data: d.data ?? null, // 'AAAA-MM-DD'
+    peso: nota ? (d.peso ?? 1) : 1, // só conta no modo 'nota'
+    notaMaxima: nota ? (d.notaMaxima ?? 10) : null,
+    notas: d.notas ?? {}, // modo 'nota': { [alunoId]: number }
+    aptos: d.aptos ?? {}, // modo 'apto': { [alunoId]: true | false }
+  };
+};

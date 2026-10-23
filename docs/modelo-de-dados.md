@@ -21,7 +21,7 @@ avaliacoes/{avaliacaoId}            avaliação da turma + notas de todos
 curso 1───n turma 1───n matrícula n───1 aluno
                  │
                  ├───n aula        (chamada: { alunoId: P|F|J })
-                 └───n avaliação   (notas:   { alunoId: nota })
+                 └───n avaliação   (resultados: { alunoId: nota }  ou  { alunoId: true | false })
 
 edital ──oferta──▶ turmas
    └───n inscrição ──(seleção)──▶ convocada ──(requisitos ok)──▶ matrícula (+ aluno)
@@ -66,10 +66,11 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
 | Decisão | Por quê |
 |---|---|
 | **Chamada num único documento** (`aulas/{id}.registros = { alunoId: 'P' }`) | Marcar a turma toda é **1 escrita**, e a tela de chamada lê **1 documento**. É o que dá velocidade à marcação rápida. Limite do Firestore: 1 MiB por documento — comporta milhares de alunos por aula. |
-| **Notas num único documento** (`avaliacoes/{id}.notas`) | Mesma lógica: lançar a coluna de uma prova = 1 escrita. |
+| **Resultados num único documento** (`avaliacoes/{id}.notas` ou `.aptos`) | Mesma lógica: lançar a coluna de uma prova = 1 escrita. |
+| **Forma de avaliar em cada avaliação** (`avaliacoes.modo`) | Quem avalia decide, prova a prova, se vale nota (0 a 10) ou Apto / Não apto. As duas convivem na mesma turma: a matrícula guarda `media` (das notas) e `aptidao` (dos Apto / Não apto) separadas, sem misturar escalas. O curso só **sugere** uma forma (`cursos.modoAvaliacao`) para já vir marcada ao criar uma avaliação. |
 | **ID determinístico** em matrículas e aulas | `turmaId_alunoId` impede matrícula duplicada; `turmaId_data` impede dois diários no mesmo dia. Sem consulta prévia e sem condição de corrida. |
 | **Nomes copiados** (`alunoNome`, `cursoNome`…) | Firestore não tem JOIN. Listas de matrículas/turmas aparecem sem leituras extras. Custo: se renomear um curso, as cópias antigas ficam como estavam (aceitável aqui; corrija com um script se precisar). |
-| **Resumo na matrícula** (`frequencia`, `riscoEvasao`, `media`) | Painel e lista de "alunos em risco" viram uma consulta simples. É **recalculado do zero** após cada chamada/nota (`js/domain/regras.js`), nunca incrementado — corrigir uma chamada antiga não desajusta contadores. |
+| **Resumo na matrícula** (`frequencia`, `riscoEvasao`, `media` e `aptidao`) | Painel e lista de "alunos em risco" viram uma consulta simples. É **recalculado do zero** após cada chamada/avaliação (`js/domain/regras.js`, `diario.js` e `avaliacoes.js`), nunca incrementado — corrigir uma chamada ou nota antiga não desajusta contadores. |
 | **Datas de calendário como `'AAAA-MM-DD'`** | Evita o bug de "a aula caiu um dia antes" por fuso horário. Só `criadoEm`/`atualizadoEm` usam Timestamp. |
 | **Contagens do painel via `getCountFromServer`** | Não precisa manter contadores globais. Únicos contadores manuais: `turmas.vagasOcupadas` e `turmas.vagasReservadas`, alterados só dentro de transações. |
 | **Vaga reservada na convocação** (`vagasReservadas`) | Convocar reserva a vaga; matricular a converte em ocupada; desistir/prazo a devolve. Vaga livre = `vagas − ocupadas − reservadas`. Assim a seleção nunca convoca mais gente do que há vagas, mesmo com convocados ainda reunindo documentos. |
@@ -111,10 +112,12 @@ Todas as coleções são **de primeiro nível** (sem subcoleções). Isso simpli
   "descricao": "HTML, CSS e JavaScript do zero.",
   "cargaHoraria": 60,
   "frequenciaMinima": 75,
+  "modoAvaliacao": "nota",
   "mediaAprovacao": 7,
   "ativo": true
 }
 ```
+`modoAvaliacao` é só a **forma de avaliar sugerida** ao criar uma avaliação do curso: `nota` ou `apto`. Quem cria a avaliação pode escolher a outra, e as duas podem existir na mesma turma. `mediaAprovacao` vale para as avaliações por nota. Cursos antigos, sem o campo, sugerem `nota`.
 
 ### `turmas/{turmaId}`
 ```json
@@ -285,10 +288,11 @@ Guarda ids, não nomes (o registro pode ser divulgado sem expor dados pessoais).
     "percentual": 70
   },
   "riscoEvasao": true,
-  "media": 7.4
+  "media": 7.4,
+  "aptidao": null
 }
 ```
-`status`: `ativa` | `trancada` | `evadida` | `concluida` | `cancelada`. Ao mudar de situação a matrícula ganha `motivoSituacao`, `situacaoEm` e `situacaoPor`.
+`media` vem das avaliações por nota e `aptidao` (`{ "avaliadas": 3, "aptas": 2, "naoAptas": 1 }`) das avaliações Apto / Não apto. Cada uma fica `null` enquanto a pessoa não tem resultado daquela forma (numa turma que só usa uma das formas, a outra fica sempre `null`). `status`: `ativa` | `trancada` | `evadida` | `concluida` | `cancelada`. Ao mudar de situação a matrícula ganha `motivoSituacao`, `situacaoEm` e `situacaoPor`.
 
 **Ciclo da matrícula** (`js/domain/matricula.js`; só a matrícula **ativa** ocupa vaga):
 
@@ -314,20 +318,39 @@ Guarda ids, não nomes (o registro pode ser divulgado sem expor dados pessoais).
 Marcação: `P` presente · `F` falta · `J` falta justificada (conta como presença no percentual por padrão; configurável em `calcularFrequencia`). Quem entra na chamada de uma data (`pessoasDaChamada`): as matrículas **ativas feitas até aquela data** e quem já consta na chamada gravada daquele dia, mesmo que hoje esteja trancado ou tenha saído.
 
 ### `avaliacoes/{avaliacaoId}`
+Modo `nota`:
 ```json
 {
   "turmaId": "t9x8",
+  "modo": "nota",
   "titulo": "Prova 1 — HTML e CSS",
   "tipo": "prova",
   "data": "2026-03-25",
   "peso": 2,
   "notaMaxima": 10,
-  "notas": { "a1b2": 7.5, "c3d4": 5 }
+  "notas": { "a1b2": 7.5, "c3d4": 5 },
+  "aptos": {}
 }
 ```
-Quem não aparece em `notas` ainda não teve a nota lançada (não é zero). A média da matrícula é a média ponderada normalizada para 0–10.
+Modo `apto` (`peso` fixo em 1 e `notaMaxima` nula, sem efeito):
+```json
+{
+  "turmaId": "t9x8",
+  "modo": "apto",
+  "titulo": "Entrega das atividades",
+  "tipo": "participacao",
+  "data": "2026-03-27",
+  "peso": 1,
+  "notaMaxima": null,
+  "notas": {},
+  "aptos": { "a1b2": true, "c3d4": false }
+}
+```
+`modo` é a **forma de avaliar escolhida ao criar a avaliação**: só o mapa dele é usado (`notas` no modo `nota`, `aptos` no modo `apto`); o outro fica vazio, o que permite trocar de forma enquanto não há resultados. `tipo`: `prova` | `trabalho` | `projeto` | `participacao`. **Quem não aparece no mapa de resultados ainda não foi avaliado** (não é zero nem "não apto"): a média ignora a pessoa naquela avaliação.
 
-> **Decisão para o módulo de Avaliações (a construir):** a forma de avaliar **varia de instituição para instituição**, então será **configurável por curso**: **Apto / Não apto** (sem número) ou **nota numérica**. Cada avaliação registrará, conforme o modo do curso, `apto` (verdadeiro/falso) ou `nota`. O resultado final cruza a avaliação com a frequência mínima do curso: no modo Apto/Não apto, a pessoa precisa estar apta em todas as avaliações; no modo nota, a média precisa alcançar `mediaAprovacao`. O texto acima descreve o modo de nota; o modo Apto/Não apto ainda não está modelado.
+A **média da matrícula** é a média ponderada das avaliações por nota, com cada nota normalizada para 0–10 pela `notaMaxima` da avaliação (`calcularMedia`). A **aptidão** conta, entre as avaliações Apto / Não apto em que a pessoa tem resultado, quantas foram Apto e quantas Não apto.
+
+> **Resultado final (a construir):** o resultado final cruza a avaliação com a frequência mínima do curso: a pessoa precisa estar apta nas avaliações Apto / Não apto e, se a turma tiver avaliações por nota, a média precisa alcançar `mediaAprovacao`. Hoje o sistema só guarda `media` e `aptidao`; a decisão "aprovado ou não" ainda não é calculada.
 
 ---
 
@@ -369,7 +392,7 @@ Todos os que mexem em vagas são **transações** (tudo ou nada) e seguem a mesm
 
 **Registrar, corrigir e excluir uma aula** — ✅ `registrarAula` / `excluirAula` (`js/services/diario.service.js`, regras puras em `js/domain/diario.js`): uma única transação que (1) grava (ou corrige, ou apaga) `aulas/{turmaId_data}` com `registros` e `resumo` e (2) **recalcula do zero**, com todas as aulas de agora, a `frequencia` e o `riscoEvasao` de **todas** as matrículas da turma. Como nada é incrementado, corrigir ou excluir uma aula antiga acerta os números sozinho, e uma aula inserida no meio respeita a **ordem das datas** (importa para faltas consecutivas). A chamada exige uma marca para cada pessoa da lista; datas futuras são recusadas; turma cancelada não recebe chamada. O professor da turma pode registrar e corrigir; **excluir é só da coordenação** (regras do Firestore e botão da tela). Se outra pessoa criar uma aula entre a consulta e a gravação, ela não entra naquele cálculo, e a gravação seguinte corrige.
 
-**Lançar notas** (a construir): gravar `avaliacoes/{id}` e recalcular `matriculas.media` com `calcularMedia` (modo nota) ou o resultado apto/não apto (ver a decisão acima).
+**Criar, editar, lançar e excluir avaliações** — ✅ `criarAvaliacao` / `editarAvaliacao` / `lancarResultados` / `excluirAvaliacao` (`js/services/avaliacoes.service.js`, regras puras em `js/domain/avaliacoes.js`): como no diário, uma única transação que (1) grava a avaliação (ou a apaga) e (2) **recalcula do zero** `media` (modo nota) ou `aptidao` (modo apto) de **todas** as matrículas da turma, com todas as avaliações de agora. Por isso mudar o peso de uma avaliação, corrigir uma nota ou excluir uma avaliação acerta as médias sozinho. A forma de avaliar (nota ou Apto / Não apto) é escolhida ao criar a avaliação; o curso só sugere qual já vem marcada. Recusas: turma cancelada; nota fora de 0 a `notaMaxima`; resultado de quem não tem matrícula na turma; reduzir a `notaMaxima` abaixo da maior nota já lançada; **trocar a forma de avaliar com resultados já lançados** (limpe os resultados e salve antes). Entram na lista de lançamento as matrículas **ativas** e quem já tem resultado na avaliação, mesmo que hoje esteja trancado ou tenha saído. O professor da turma pode criar, editar e lançar; **excluir é só da coordenação** (regras do Firestore e botão da tela). Os resultados não precisam estar completos: quem fica de fora continua "sem resultado".
 
 **Mudar a situação da matrícula** — ✅ `alterarSituacaoMatricula` (`js/services/matriculas.service.js`): numa transação, valida a transição, ajusta `vagasOcupadas` (nunca abaixo de zero), grava o motivo e recalcula a situação do aluno a partir de **todas** as matrículas dele (as outras são procuradas antes e relidas dentro da transação). A vaga liberada fica disponível para o próximo remanescente, que se convoca na tela de Inscrições.
 
@@ -379,4 +402,4 @@ Todos os que mexem em vagas são **transações** (tudo ou nada) e seguem a mesm
 
 Consultas com filtro de igualdade + `orderBy` em outro campo exigem índice composto. Os usados nos serviços atuais estão em [`firestore.indexes.json`](../firestore.indexes.json). Se uma consulta nova falhar, o console do navegador mostra um link que cria o índice com um clique.
 
-Enquanto os volumes são pequenos (uma incubadora), os serviços preferem **filtrar por igualdade no servidor e ordenar/filtrar o resto no cliente** — é o caso de `listarInscricoesDoEdital`, `listarRemanescentes` e `listarTurmasMatriculaveis`, que por isso não precisam de índice (só filtros de igualdade).
+Enquanto os volumes são pequenos (uma incubadora), os serviços preferem **filtrar por igualdade no servidor e ordenar/filtrar o resto no cliente** — é o caso de `listarInscricoesDoEdital`, `listarRemanescentes`, `listarTurmasMatriculaveis` e `listarAvaliacoesDaTurma` (a ordem por data é no cliente), que por isso não precisam de índice (só filtros de igualdade).

@@ -20,7 +20,7 @@ const MENU = [
   { id: 'inscricoes', rotulo: 'Inscrições', pronto: true, papeis: GESTAO },
   { id: 'alunos', rotulo: 'Alunos', pronto: true, papeis: GESTAO },
   { id: 'diario', rotulo: 'Diário de classe', pronto: true }, // todos os papéis: o professor usa aqui
-  { id: 'avaliacoes', rotulo: 'Avaliações', pronto: false },
+  { id: 'avaliacoes', rotulo: 'Avaliações', pronto: true }, // todos os papéis: o professor lança as notas aqui
 ];
 
 /**

@@ -20,6 +20,7 @@ gestao_pedagogica/
 │   ├── turmas.html             Turmas: vagas, dias, horário, professor e situação
 │   ├── alunos.html             Alunos: ficha (cadastro, matrículas, documentos), busca e filtros
 │   ├── diario.html             Diário de classe: chamada rápida (P/F/J) e conteúdo da aula; usado pelo professor
+│   ├── avaliacoes.html         Avaliações da turma: criar (escolhendo nota ou Apto / Não apto em cada uma) e lançar os resultados; usado pelo professor
 │   ├── editais.html            Processos seletivos: criar, configurar e avançar de etapa
 │   └── inscricoes.html         Inscrições de um edital: seleção, convocação e matrícula
 ├── css/
@@ -42,6 +43,7 @@ gestao_pedagogica/
 │   ├── domain/
 │   │   ├── regras.js           Frequência, risco de evasão, média (funções puras)
 │   │   ├── cadastros.js        Validação de curso, turma e aluno (valores de formulário → dados limpos; CPF)
+│   │   ├── avaliacoes.js       Avaliações (nota ou Apto / Não apto, por avaliação): validação dos resultados, recálculo de média e aptidão
 │   │   ├── matricula.js        Ciclo da matrícula: transições permitidas, efeito nas vagas, situação do aluno
 │   │   ├── diario.js           Chamada: validação, quem entra na lista, recálculo da frequência e do risco
 │   │   ├── pessoa.js           Nome social como nome de exibição; gênero com "Outro" (texto livre)
@@ -50,6 +52,7 @@ gestao_pedagogica/
 │   │   ├── alunos.service.js         ← molde dos demais; cadastro, documentos
 │   │   ├── matriculas.service.js     ciclo da matrícula (trancar, evadir, cancelar…) e matrícula direta
 │   │   ├── diario.service.js         registrar/corrigir/excluir aula e recalcular a frequência (uma transação)
+│   │   ├── avaliacoes.service.js     criar/editar/excluir avaliação e lançar resultados, recalculando média ou aptidão (uma transação)
 │   │   ├── editais.service.js        criar/editar edital, avançar etapa
 │   │   ├── selecao.service.js        realizar a seleção do edital (sorteio/classificação, com registro auditável)
 │   │   ├── inscricoes.service.js     convocar, efetivar matrícula (transação), desistência, indeferir
@@ -67,6 +70,7 @@ gestao_pedagogica/
 │       ├── turmas.js
 │       ├── alunos.js
 │       ├── diario.js
+│       ├── avaliacoes.js
 │       ├── editais.js
 │       └── inscricoes.js
 ├── tools/
@@ -104,7 +108,7 @@ Detalhes e justificativas em [`docs/modelo-de-dados.md`](docs/modelo-de-dados.md
 Enquanto `js/core/config.js` estiver com `COLE_AQUI` **e** a página estiver em `localhost`, o sistema entra sozinho em modo desenvolvimento: um Firebase **simulado no navegador** (`js/dev/`) responde no lugar do real. Dá para entrar, criar editais, sortear, matricular etc. sem configurar nada.
 
 - **Contas:** a tela de login mostra um botão por conta de desenvolvimento (Admin, Coordenação e Professor, para testar os três níveis de acesso). Os e-mails e a senha estão em [`js/dev/seed.js`](js/dev/seed.js).
-- **Dados:** o cenário de exemplo (um edital em cada etapa, turmas, alunos, matrículas) fica salvo no `localStorage` do navegador e **persiste entre páginas e recargas**. O botão **Restaurar dados** na faixa laranja do rodapé volta ao cenário original. Mudou o `seed.js`? Aumente `SEED_VERSAO` para os dados salvos serem refeitos.
+- **Dados:** o cenário de exemplo (um edital em cada etapa, turmas, alunos, matrículas, aulas e avaliações das duas formas, misturadas nas turmas de *Desenvolvimento Web* e *Fotografia*) fica salvo no `localStorage` do navegador e **persiste entre páginas e recargas**. O botão **Restaurar dados** na faixa laranja do rodapé volta ao cenário original. Mudou o `seed.js`? Aumente `SEED_VERSAO` para os dados salvos serem refeitos.
 - **Integrações simuladas:** o envio de documentos (que usaria o Cloudinary) também funciona no modo desenvolvimento: o arquivo fica guardado no navegador, com limite de 600 KB.
 - **Aviso permanente:** a faixa laranja "MODO DESENVOLVIMENTO" aparece em todas as telas, para não confundir com dados reais.
 - **Desliga sozinho** ao preencher o `firebaseConfig`, e nunca liga fora de `localhost`/`127.0.0.1`. A pasta `js/dev/` está no `ignore` do `firebase.json` e não vai para o hosting.
@@ -132,7 +136,7 @@ ES Modules não funcionam abrindo o arquivo direto (`file://`); sirva por HTTP. 
 powershell -ExecutionPolicy Bypass -File tools\serve.ps1
 ```
 
-Depois abra `http://localhost:5500`. Alternativas: a extensão **Live Server** do VS Code (a porta 5502 já está em `.vscode/settings.json`: clique com o botão direito em `index.html` → *Open with Live Server*), ou `npx serve .` / `python -m http.server 5500` se tiver Node/Python.
+Depois abra `http://localhost:5500`. (`.claude/launch.json` guarda essa mesma configuração para o preview do Claude Code.) Alternativas: a extensão **Live Server** do VS Code (a porta 5502 já está em `.vscode/settings.json`: clique com o botão direito em `index.html` → *Open with Live Server*), ou `npx serve .` / `python -m http.server 5500` se tiver Node/Python.
 
 Para o login funcionar em `localhost`, o domínio já vem autorizado por padrão no Firebase Auth. Ao publicar, adicione seu domínio em Authentication → Configurações → Domínios autorizados.
 
@@ -140,13 +144,12 @@ Para o login funcionar em `localhost`, o domínio já vem autorizado por padrão
 
 Construir, tudo no modo desenvolvimento:
 
-1. **Avaliações e notas**, com a forma de avaliar **configurável por curso**: **Apto / Não apto** ou **nota numérica** (varia de instituição para instituição). Grade turma × avaliação com lançamento em lote, para o professor.
-2. **Resultado final e boletim**: situação final (aprovado ou não) cruzando a avaliação com a frequência mínima do curso, e o boletim por aluno. Hoje "Concluir" é manual e não diz se a pessoa passou.
-3. **Equipe**: telas para cadastrar professores e coordenadores e definir o papel de cada um (hoje a equipe só existe nos dados de exemplo).
-4. **Relatórios com exportação em CSV** (matriculados, frequência, notas, e-mails dos convocados).
-5. **Acabamento de portfólio**: testes que rodem no navegador, capturas de tela no README, dados de exemplo mais ricos.
+1. **Resultado final e boletim**: situação final (aprovado ou não) cruzando a avaliação (média ou Apto / Não apto) com a frequência mínima do curso, e o boletim por aluno. Hoje "Concluir" é manual e não diz se a pessoa passou.
+2. **Equipe**: telas para cadastrar professores e coordenadores e definir o papel de cada um (hoje a equipe só existe nos dados de exemplo).
+3. **Relatórios com exportação em CSV** (matriculados, frequência, notas, e-mails dos convocados).
+4. **Acabamento de portfólio**: testes que rodem no navegador, capturas de tela no README, dados de exemplo mais ricos.
 
-Já pronto: login e painel (com visão própria do professor), cursos, turmas, editais, inscrições (com sorteio auditável), formulário público (com nome social e gênero), alunos/matrículas e **diário de classe com frequência e risco de evasão reais**.
+Já pronto: login e painel (com visão própria do professor), cursos, turmas, editais, inscrições (com sorteio auditável), formulário público (com nome social e gênero), alunos/matrículas, **diário de classe com frequência e risco de evasão reais** e **avaliações com a forma de avaliar escolhida em cada uma, ao criá-la** (nota de 0 a 10 com média ponderada, ou Apto / Não apto; o curso só sugere a forma padrão, e as duas convivem na mesma turma).
 
 Ao implantar (adiado por decisão):
 

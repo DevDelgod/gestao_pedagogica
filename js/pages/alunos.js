@@ -7,7 +7,7 @@ import { idadeEm } from '../domain/cadastros.js';
 import { transicoesPossiveis } from '../domain/matricula.js';
 import { nomeExibicao, temNomeSocial } from '../domain/pessoa.js';
 import { GENEROS, PAPEIS, STATUS_MATRICULA as M } from '../models/schema.js';
-import { ROTULO_ACAO_MATRICULA, ROTULO_GENERO, ROTULO_STATUS_ALUNO, ROTULO_STATUS_MATRICULA } from '../models/rotulos.js';
+import { ROTULO_ACAO_MATRICULA, ROTULO_GENERO, ROTULO_STATUS_ALUNO, ROTULO_STATUS_MATRICULA, textoDesempenho } from '../models/rotulos.js';
 import { anexarDocumento, listarAlunos, removerDocumento, salvarAluno } from '../services/alunos.service.js';
 import { alterarSituacaoMatricula, listarMatriculas, matricularDireto } from '../services/matriculas.service.js';
 import { aceitaMatricula, turmasRepo, vagasLivres } from '../services/turmas.service.js';
@@ -270,7 +270,7 @@ function renderizarMatriculas(a) {
 
 function matriculaHtml(m) {
   const freq = m.frequencia?.aulas ? `Frequência ${String(m.frequencia.percentual).replace('.', ',')}% em ${m.frequencia.aulas} aula(s)` : 'Sem aulas registradas';
-  const media = typeof m.media === 'number' ? ` · Média ${String(m.media).replace('.', ',')}` : '';
+  const desempenho = textoDesempenho(m) ? ` · ${textoDesempenho(m)}` : '';
   const acoes = transicoesPossiveis(m.status)
     .map((para) => `<button class="botao botao--pequeno ${para === M.ATIVA ? '' : 'botao--fantasma'}" type="button" data-matricula="${escapar(m.id)}" data-para="${para}">${ROTULO_ACAO_MATRICULA[para]}</button>`)
     .join('');
@@ -279,7 +279,7 @@ function matriculaHtml(m) {
       <div class="subitem__texto">
         <strong>${escapar(m.turmaNome)} <span class="selo ${SELO_MATRICULA[m.status]}">${ROTULO_STATUS_MATRICULA[m.status]}</span>${m.riscoEvasao && m.status === M.ATIVA ? ' <span class="selo selo--atencao">Risco de evasão</span>' : ''}</strong>
         <span class="item__meta">${escapar(m.cursoNome)} · matriculado em ${formatarData(m.dataMatricula)}</span>
-        <span class="item__meta">${freq}${media}</span>
+        <span class="item__meta">${freq}${desempenho}</span>
         ${m.motivoSituacao ? `<span class="item__meta">Motivo: ${escapar(m.motivoSituacao)}</span>` : ''}
       </div>
       <div class="subitem__acoes">${acoes}</div>

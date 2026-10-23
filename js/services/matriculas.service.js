@@ -23,6 +23,7 @@ export const matriculasRepo = criarRepo(COLECOES.MATRICULAS);
 
 export const listarMatriculas = () => matriculasRepo.listar();
 export const listarMatriculasDoAluno = (alunoId) => matriculasRepo.listar(where('alunoId', '==', alunoId));
+export const listarMatriculasDaTurma = (turmaId) => matriculasRepo.listar(where('turmaId', '==', turmaId));
 
 const usuarioAtual = () => auth.currentUser?.uid ?? null;
 

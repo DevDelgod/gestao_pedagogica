@@ -7,7 +7,7 @@
  */
 
 /** Mude a versão sempre que alterar a semente: os dados de exemplo salvos no navegador são refeitos. */
-export const SEED_VERSAO = 5;
+export const SEED_VERSAO = 7;
 
 export const CONTAS_DEV = [
   {
@@ -51,12 +51,13 @@ export function semear(store, Timestamp) {
   );
 
   // --- cursos e turmas ---
-  const curso = (id, nome, cargaHoraria) =>
-    store.set(`cursos/${id}`, { nome, descricao: '', cargaHoraria, frequenciaMinima: 75, mediaAprovacao: 7, ativo: true, ...auditoria(60) });
+  // modoAvaliacao é só a forma SUGERIDA ao criar uma avaliação ('nota' ou 'apto'): cada avaliação escolhe a sua
+  const curso = (id, nome, cargaHoraria, modoAvaliacao = 'nota') =>
+    store.set(`cursos/${id}`, { nome, descricao: '', cargaHoraria, frequenciaMinima: 75, modoAvaliacao, mediaAprovacao: 7, ativo: true, ...auditoria(60) });
   curso('c1', 'Desenvolvimento Web', 60);
   curso('c2', 'Design Gráfico', 40);
   curso('c3', 'Robótica', 50);
-  curso('c4', 'Fotografia', 30);
+  curso('c4', 'Fotografia', 30, 'apto'); // oficina que costuma avaliar por Apto / Não apto
   curso('c5', 'Programação com Python', 60);
 
   const turma = (id, nome, cursoId, vagas, ocupadas = 0, status = 'aberta', extras = {}) => {
@@ -68,7 +69,7 @@ export function semear(store, Timestamp) {
     });
   };
   turma('t1', 'Web 2026.1 — Noite', 'c1', 5, 1); // 4 vagas livres
-  // turmas sem professor definido: o professor de exemplo (dev-prof) só enxerga t1, t5 e t6 no Diário
+  // turmas sem professor definido: o professor de exemplo (dev-prof) só enxerga t1, t5, t6 e t8 no Diário e nas Avaliações
   const semProfessor = { professorId: null, professorNome: null };
   turma('t2', 'Design 2026.1 — Tarde', 'c2', 2, 0, 'aberta', semProfessor);
   turma('t3', 'Robótica 2026.1', 'c3', 3, 0, 'aberta', semProfessor);
@@ -76,6 +77,10 @@ export function semear(store, Timestamp) {
   turma('t7', 'Python 2026.1 — Manhã', 'c5', 3, 0, 'aberta', semProfessor);
   turma('t6', 'Web 2025.2 — Noite', 'c1', 10, 4, 'em_andamento', { dataInicio: '2025-08-04', dataFim: '2025-12-10' });
   turma('t5', 'Web 2025.1 — Encerrada', 'c1', 10, 0, 'encerrada');
+  // curso avaliado por Apto / Não apto: mostra o outro modo das Avaliações
+  turma('t8', 'Fotografia 2025.2 — Sábado', 'c4', 8, 3, 'em_andamento', {
+    diasSemana: ['sab'], horarioInicio: '09:00', horarioFim: '12:00', dataInicio: '2025-08-02', dataFim: '2025-12-06',
+  });
 
   // --- alunos e matrículas já existentes (mantêm vagasOcupadas coerente com as turmas) ---
   const aluno = (id, nome, status = 'ativo', extras = {}) =>
@@ -84,12 +89,14 @@ export function semear(store, Timestamp) {
   const anoAtual = new Date(agora).getFullYear();
   // documento de exemplo (imagem de 1 pixel): serve para mostrar a lista de documentos na ficha
   const documentoExemplo = { nome: 'rg-frente.png', url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', publicId: 'fudev/alunos/documentos/exemplo01', tipo: 'image', formato: 'png', bytes: 70 };
-  const matricula = (turmaId, alunoId, status, frequencia, riscoEvasao = false, media = null) => {
+  // `media` (cursos por nota) e `aptidao` (cursos Apto / Não apto) repetem o que as avaliações de exemplo, mais abaixo, resultam
+  const matricula = (turmaId, alunoId, status, frequencia, riscoEvasao = false, media = null, aptidao = null) => {
     const t = store.get(`turmas/${turmaId}`);
     const a = store.get(`alunos/${alunoId}`);
     store.set(`matriculas/${turmaId}_${alunoId}`, {
-      alunoId, alunoNome: a.nomeSocial || a.nome, turmaId, turmaNome: t.nome, // a cópia usa o nome social, se houver cursoId: t.cursoId, cursoNome: t.cursoNome,
-      inscricaoId: null, dataMatricula: '2025-07-28', status, frequencia, riscoEvasao, media, ...auditoria(90),
+      // a cópia do nome do aluno usa o nome social, se houver
+      alunoId, alunoNome: a.nomeSocial || a.nome, turmaId, turmaNome: t.nome, cursoId: t.cursoId, cursoNome: t.cursoNome,
+      inscricaoId: null, dataMatricula: '2025-07-28', status, frequencia, riscoEvasao, media, aptidao, ...auditoria(90),
     });
   };
   const freq = (aulas, presencas, faltas, justificadas, faltasConsecutivas, percentual) => ({ aulas, presencas, faltas, justificadas, faltasConsecutivas, percentual });
@@ -106,11 +113,18 @@ export function semear(store, Timestamp) {
     endereco: endereco('São Paulo', 'Pirituba'),
   });
   aluno('a-davi', 'Davi Nogueira', 'inativo', { dataNascimento: '1998-02-09', genero: 'outro', generoOutro: 'Demigênero' }); // concluiu a turma de 2025.1
+  aluno('a-ravi', 'Ravi Menezes', 'ativo', { dataNascimento: '2000-03-10', endereco: endereco('São Paulo', 'Vila Madalena') });
+  aluno('a-sol', 'Solange Andrade', 'ativo', { nomeSocial: 'Sol Andrade', genero: 'genero_fluido', dataNascimento: '1996-12-02' });
+  aluno('a-yuri', 'Yuri Tanaka', 'ativo', { dataNascimento: '2002-08-21', genero: 'nao_informar' });
   matricula('t1', 'a-lia', 'ativa', freq(0, 0, 0, 0, 0, 100));
-  matricula('t6', 'a-caio', 'ativa', freq(10, 9, 1, 0, 0, 90), false, 8.2);
-  matricula('t6', 'a-nina', 'ativa', freq(10, 6, 4, 0, 3, 60), true, 5.5); // em risco de evasão
-  matricula('t6', 'a-tomas', 'ativa', freq(10, 8, 1, 1, 0, 90), false, 7.4);
-  matricula('t6', 'a-bia', 'ativa', freq(10, 10, 0, 0, 0, 100), false, 9.1);
+  matricula('t8', 'a-ravi', 'ativa', freq(0, 0, 0, 0, 0, 100), false, 9, { avaliadas: 2, aptas: 2, naoAptas: 0 });
+  matricula('t8', 'a-sol', 'ativa', freq(0, 0, 0, 0, 0, 100), false, 8, { avaliadas: 2, aptas: 1, naoAptas: 1 });
+  matricula('t8', 'a-yuri', 'ativa', freq(0, 0, 0, 0, 0, 100), false, null, { avaliadas: 1, aptas: 1, naoAptas: 0 });
+  // t6 mistura as duas formas: provas e trabalho por nota (media) e uma entrega de atividades Apto / Não apto (aptidao)
+  matricula('t6', 'a-caio', 'ativa', freq(10, 9, 1, 0, 0, 90), false, 8.2, { avaliadas: 1, aptas: 1, naoAptas: 0 });
+  matricula('t6', 'a-nina', 'ativa', freq(10, 6, 4, 0, 3, 60), true, 5.5, { avaliadas: 1, aptas: 0, naoAptas: 1 }); // em risco de evasão
+  matricula('t6', 'a-tomas', 'ativa', freq(10, 8, 1, 1, 0, 90), false, 7.4, { avaliadas: 1, aptas: 1, naoAptas: 0 });
+  matricula('t6', 'a-bia', 'ativa', freq(10, 10, 0, 0, 0, 100), false, 9.1, { avaliadas: 1, aptas: 1, naoAptas: 0 });
   matricula('t6', 'a-olga', 'evadida', freq(10, 3, 7, 0, 7, 30), false, 4);
   matricula('t5', 'a-davi', 'concluida', freq(20, 19, 1, 0, 0, 95), false, 8.8);
 
@@ -139,6 +153,24 @@ export function semear(store, Timestamp) {
       ...auditoria(90),
     });
   });
+
+  // --- avaliações: os resultados batem com a `media` e a `aptidao` das matrículas acima ---
+  // (regravar os resultados sem mudar nada produz exatamente os mesmos números)
+  // `modo` é a forma de avaliar escolhida em cada avaliação: 'nota' usa `notas` (com peso e nota máxima), 'apto' usa `aptos`
+  const avaliacao = (id, turmaId, modo, titulo, tipo, data, extras) =>
+    store.set(`avaliacoes/${id}`, { turmaId, modo, titulo, tipo, data, ...extras, ...auditoria(60) });
+  const porNota = (peso, notas) => ({ peso, notaMaxima: 10, notas, aptos: {} });
+  const porAptidao = (aptos) => ({ peso: 1, notaMaxima: null, notas: {}, aptos });
+  // média ponderada de t6 (pesos 2, 1 e 2): Caio 8,2 · Nina 5,5 · Tomás 7,4 · Bia 9,1 · Olga 4 (evadiu depois da 1ª prova)
+  avaliacao('av1', 't6', 'nota', 'Prova 1 — HTML e CSS', 'prova', '2025-08-20', porNota(2, { 'a-caio': 8, 'a-nina': 5, 'a-tomas': 7, 'a-bia': 9, 'a-olga': 4 }));
+  avaliacao('av2', 't6', 'nota', 'Trabalho — Página pessoal', 'trabalho', '2025-08-27', porNota(1, { 'a-caio': 9, 'a-nina': 7.5, 'a-tomas': 9, 'a-bia': 9.5 }));
+  avaliacao('av3', 't6', 'nota', 'Prova 2 — CSS e JavaScript', 'prova', '2025-09-03', porNota(2, { 'a-caio': 8, 'a-nina': 5, 'a-tomas': 7, 'a-bia': 9 }));
+  avaliacao('av4', 't5', 'nota', 'Projeto final', 'projeto', '2025-06-20', porNota(1, { 'a-davi': 8.8 }));
+  avaliacao('av5', 't8', 'apto', 'Retrato em luz natural', 'projeto', '2025-09-06', porAptidao({ 'a-ravi': true, 'a-sol': true, 'a-yuri': true }));
+  avaliacao('av6', 't8', 'apto', 'Prática de iluminação', 'trabalho', '2025-09-13', porAptidao({ 'a-ravi': true, 'a-sol': false }));
+  // as duas formas convivem na mesma turma: Web também tem uma avaliação Apto / Não apto, e Fotografia uma por nota
+  avaliacao('av7', 't6', 'apto', 'Entrega das atividades', 'participacao', '2025-09-02', porAptidao({ 'a-caio': true, 'a-nina': false, 'a-tomas': true, 'a-bia': true }));
+  avaliacao('av8', 't8', 'nota', 'Crítica do portfólio', 'trabalho', '2025-09-20', porNota(1, { 'a-ravi': 9, 'a-sol': 8 }));
 
   // --- editais, um em cada etapa ---
   const requisitos = [

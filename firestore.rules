@@ -39,7 +39,7 @@ service cloud.firestore {
     // Professor só pode alterar o resumo acadêmico da matrícula (recalculado após chamada/nota).
     function soResumoAcademico() {
       return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['frequencia', 'riscoEvasao', 'media', 'atualizadoEm']);
+        .hasOnly(['frequencia', 'riscoEvasao', 'media', 'aptidao', 'atualizadoEm']);
     }
 
     // ---------- equipe ----------
@@ -134,7 +134,9 @@ service cloud.firestore {
     match /avaliacoes/{id} {
       allow read: if ehEquipe();
       allow create: if ehGestao() || (ehProfessor() && leciona(request.resource.data.turmaId));
-      allow update: if ehGestao() || (ehProfessor() && leciona(resource.data.turmaId));
+      // o professor não move a avaliação para a turma de outra pessoa
+      allow update: if ehGestao()
+        || (ehProfessor() && leciona(resource.data.turmaId) && request.resource.data.turmaId == resource.data.turmaId);
       allow delete: if ehGestao();
     }
 
