@@ -59,10 +59,13 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Cadastro do aluno. Menores de 18 anos exigem o nome do responsável.
+ * Pessoas importadas do sistema oficial podem trazer um CPF que não fecha os dígitos e menores sem responsável
+ * cadastrado: editar outro campo delas não pode travar por isso, então o CPF que já está gravado vale como está
+ * e `exigirResponsavel` pode ser desligado.
  * @param {object} entrada valores crus do formulário
- * @param {{ hoje: string }} contexto `hoje` em 'AAAA-MM-DD' (injetado para a função continuar pura)
+ * @param {{ hoje: string, cpfJaGravado?: string, exigirResponsavel?: boolean }} contexto `hoje` em 'AAAA-MM-DD' (injetado para a função continuar pura)
  */
-export function validarAluno(entrada, { hoje }) {
+export function validarAluno(entrada, { hoje, cpfJaGravado = '', exigirResponsavel = true }) {
   const nome = texto(entrada.nome);
   if (nome.length < 2 || nome.length > 120) return { erro: 'Informe o nome do aluno (de 2 a 120 caracteres).' };
 
@@ -78,7 +81,7 @@ export function validarAluno(entrada, { hoje }) {
   if (telefone.length > 30) return { erro: 'O telefone pode ter no máximo 30 caracteres.' };
 
   const cpf = texto(entrada.cpf).replace(/\D/g, '');
-  if (cpf && !cpfValido(cpf)) return { erro: 'CPF inválido. Confira os 11 dígitos.' };
+  if (cpf && cpf !== cpfJaGravado && !cpfValido(cpf)) return { erro: 'CPF inválido. Confira os 11 dígitos.' };
 
   const dataNascimento = texto(entrada.dataNascimento) || null;
   if (dataNascimento && !DATA.test(dataNascimento)) return { erro: 'Data de nascimento inválida.' };
@@ -88,7 +91,7 @@ export function validarAluno(entrada, { hoje }) {
   const responsavelTelefone = texto(entrada.responsavel?.telefone);
   const parentesco = texto(entrada.responsavel?.parentesco);
   const menor = dataNascimento && idadeEm(dataNascimento, hoje) < 18;
-  if (menor && !responsavelNome) return { erro: 'O aluno é menor de 18 anos: informe o nome do responsável.' };
+  if (menor && exigirResponsavel && !responsavelNome) return { erro: 'O aluno é menor de 18 anos: informe o nome do responsável.' };
 
   const cidade = texto(entrada.endereco?.cidade);
   const bairro = texto(entrada.endereco?.bairro);

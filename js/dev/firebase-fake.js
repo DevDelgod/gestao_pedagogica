@@ -1,8 +1,8 @@
 /**
- * FIREBASE SIMULADO — só para o modo desenvolvimento (ver js/core/config.js e js/core/firebase.js).
+ * FIREBASE SIMULADO — só para o modo desenvolvimento/local (ver js/core/config.js e js/core/firebase.js).
  *
  * Entrega a mesma API que js/core/firebase.js exporta (Auth + Firestore), mas tudo roda no
- * navegador e fica salvo no localStorage deste navegador: nada vai para a internet.
+ * navegador e fica salvo no IndexedDB deste navegador: nada vai para a internet.
  *
  * O que imita: login por e-mail/senha com as contas de seed.js; consultas where/orderBy; ids
  * automáticos; campos com ponto no updateDoc; serverTimestamp e increment; transações (todas as
@@ -10,14 +10,24 @@
  *
  * O que NÃO imita: regras de segurança (firestore.rules), índices compostos e concorrência real.
  * Teste isso no Firebase de verdade (emulador ou projeto de teste).
+ *
+ * Os dados têm duas origens (`dev.origem()`):
+ *  - 'exemplo': o cenário fictício de seed.js; é refeito quando SEED_VERSAO muda.
+ *  - 'local': dados de verdade (importados ou digitados); NUNCA são refeitos nem apagados por uma atualização
+ *    do código. Só saem por ação explícita (dev.limparDados, dev.restaurarBackup).
  */
-import { CONTAS_DEV, SEED_VERSAO, semear } from './seed.js';
+import { baixarArquivo } from '../core/arquivos.js';
+import { CONTAS_DEV, SEED_VERSAO, semear, semearEquipe } from './seed.js';
 
 // ---------------------------------------------------------------------------
 // Armazenamento
 // ---------------------------------------------------------------------------
-const CHAVE_DADOS = 'fudev:dev:dados';
 const CHAVE_SESSAO = 'fudev:dev:sessao';
+const CHAVE_LEGADA = 'fudev:dev:dados'; // versões antigas guardavam tudo no localStorage (limite de ~5 MB)
+const BANCO = 'fudev-local';
+const TABELA = 'dados';
+const REGISTRO = 'principal';
+const REGISTRO_CORROMPIDO = 'corrompido'; // cópia de segurança de um registro que não pôde ser lido
 
 export class Timestamp {
   constructor(ms) { this.ms = ms; }
@@ -33,7 +43,7 @@ export const serverTimestamp = () => SERVER_TS;
 export const increment = (n) => ({ __incremento: n });
 
 const lerStorage = (chave) => { try { return localStorage.getItem(chave); } catch { return null; } };
-/** Devolve false se o navegador recusar (armazenamento cheio ou bloqueado): os dados seguem só em memória. */
+/** Devolve false se o navegador recusar (armazenamento bloqueado). */
 const gravarStorage = (chave, valor) => {
   try {
     valor === null ? localStorage.removeItem(chave) : localStorage.setItem(chave, valor);
@@ -44,36 +54,87 @@ const gravarStorage = (chave, valor) => {
 };
 
 const store = new Map(); // 'colecao/id' -> dados
+let origem = 'exemplo';
+let banco = null; // IndexedDB; null se o navegador não deixar abrir (os dados ficam só em memória, até fechar a aba)
 
-let avisouArmazenamentoCheio = false;
-function salvar() {
-  const ok = gravarStorage(CHAVE_DADOS, JSON.stringify({ versao: SEED_VERSAO, docs: [...store] }, (_, v) => (v instanceof Timestamp ? { __ts: v.ms } : v)));
-  if (!ok && !avisouArmazenamentoCheio) {
-    avisouArmazenamentoCheio = true; // sem isto os dados sumiriam na recarga sem ninguém perceber
-    console.warn('[modo dev] Armazenamento do navegador cheio: as alterações não estão sendo salvas.');
-    document.querySelector('#dev-faixa span')?.replaceChildren('ATENÇÃO: armazenamento do navegador cheio. As últimas alterações não serão salvas.');
-  }
+const pedido = (req) => new Promise((ok, falha) => { req.onsuccess = () => ok(req.result); req.onerror = () => falha(req.error); });
+
+async function abrirBanco() {
+  const abertura = indexedDB.open(BANCO, 1);
+  abertura.onupgradeneeded = () => abertura.result.createObjectStore(TABELA);
+  return pedido(abertura);
 }
 
-function carregar() {
-  try {
-    const salvo = JSON.parse(lerStorage(CHAVE_DADOS) ?? 'null', (_, v) => (v && typeof v === 'object' && '__ts' in v ? new Timestamp(v.__ts) : v));
-    if (salvo?.versao === SEED_VERSAO) {
-      salvo.docs.forEach(([caminho, dados]) => store.set(caminho, dados));
-      return;
+const lerRegistro = (chave) => pedido(banco.transaction(TABELA).objectStore(TABELA).get(chave));
+
+function gravarRegistro(texto, chave = REGISTRO) {
+  return new Promise((ok, falha) => {
+    const transacao = banco.transaction(TABELA, 'readwrite');
+    texto === null ? transacao.objectStore(TABELA).delete(chave) : transacao.objectStore(TABELA).put(texto, chave);
+    transacao.oncomplete = ok;
+    transacao.onerror = transacao.onabort = () => falha(transacao.error);
+  });
+}
+
+const substituto = (_, v) => (v instanceof Timestamp ? { __ts: v.ms } : v);
+const reviver = (_, v) => (v && typeof v === 'object' && '__ts' in v ? new Timestamp(v.__ts) : v);
+const serializar = () => JSON.stringify({ versao: SEED_VERSAO, origem, docs: [...store] }, substituto);
+
+let avisouFalha = false;
+function avisarFalhaDeGravacao(erro) {
+  console.error('[modo local] Não foi possível gravar os dados neste navegador:', erro);
+  if (avisouFalha) return;
+  avisouFalha = true; // sem isto os dados sumiriam ao recarregar sem ninguém perceber
+  document.querySelector('#dev-faixa span')?.replaceChildren('ATENÇÃO: o navegador não está guardando os dados (armazenamento cheio ou bloqueado). Baixe um backup.');
+}
+
+// Gravações seguidas viram uma só: enquanto uma grava, as novas só marcam "sujo" e o laço grava o estado mais recente.
+let sujo = false;
+let gravando = null;
+/** Resolve quando o estado de AGORA já está guardado no navegador. */
+function salvar() {
+  if (!banco) return Promise.resolve();
+  sujo = true;
+  gravando ??= (async () => {
+    while (sujo) {
+      sujo = false;
+      await gravarRegistro(serializar()).catch(avisarFalhaDeGravacao);
     }
-  } catch { /* dados corrompidos: recomeça do seed */ }
+    gravando = null;
+  })();
+  return gravando;
+}
+
+async function carregar() {
+  let texto = null;
+  try {
+    banco = await abrirBanco();
+    texto = await lerRegistro(REGISTRO);
+  } catch (erro) {
+    banco = null;
+    console.warn('[modo local] IndexedDB indisponível: os dados não serão guardados entre visitas.', erro);
+  }
+  if (texto) {
+    try {
+      const salvo = JSON.parse(texto, reviver);
+      if (salvo?.origem === 'local' || salvo?.versao === SEED_VERSAO) {
+        origem = salvo.origem ?? 'exemplo';
+        salvo.docs.forEach(([caminho, dados]) => store.set(caminho, dados));
+        return;
+      }
+    } catch (erro) {
+      // dados ilegíveis: guarda uma cópia antes de recomeçar, para não perder de vez
+      console.error('[modo local] Dados guardados ilegíveis; uma cópia foi mantida.', erro);
+      await gravarRegistro(texto, REGISTRO_CORROMPIDO).catch(() => {});
+    }
+  }
   store.clear();
   semear(store, Timestamp);
-  salvar();
+  origem = 'exemplo';
+  gravarStorage(CHAVE_LEGADA, null);
+  await salvar();
 }
-carregar();
-
-/** Apaga as alterações feitas em teste e volta aos dados de exemplo. */
-function restaurarDadosDeExemplo() {
-  gravarStorage(CHAVE_DADOS, null);
-  location.reload();
-}
+await carregar();
 
 const pausa = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
@@ -132,13 +193,16 @@ const valorDe = (dados, campo) => campo.split('.').reduce((o, p) => o?.[p], dado
 const comparavel = (v) => (v instanceof Timestamp ? v.ms : v);
 
 function executar(consulta) {
-  let docs = [...store.keys()]
-    .filter((caminho) => caminho.startsWith(`${consulta.nome}/`) && !caminho.slice(consulta.nome.length + 1).includes('/'))
-    .map(instantaneo);
+  // filtra e ordena direto nos dados guardados (sem clonar cada documento); só os que sobram são clonados, ao ler
+  const prefixo = `${consulta.nome}/`;
+  let itens = [];
+  for (const [caminho, dados] of store) {
+    if (caminho.startsWith(prefixo) && !caminho.slice(prefixo.length).includes('/')) itens.push({ caminho, dados });
+  }
 
   for (const r of consulta.restricoes.filter((x) => x.tipo === 'where')) {
-    docs = docs.filter((d) => {
-      const v = valorDe(d.data(), r.campo);
+    itens = itens.filter(({ dados }) => {
+      const v = valorDe(dados, r.campo);
       if (r.op === '==') return v === r.valor;
       if (r.op === '!=') return v !== r.valor;
       if (r.op === 'in') return r.valor.includes(v);
@@ -146,14 +210,14 @@ function executar(consulta) {
     });
   }
   for (const r of consulta.restricoes.filter((x) => x.tipo === 'orderBy').reverse()) {
-    docs.sort((a, b) => {
-      const x = comparavel(valorDe(a.data(), r.campo));
-      const y = comparavel(valorDe(b.data(), r.campo));
+    itens.sort((a, b) => {
+      const x = comparavel(valorDe(a.dados, r.campo));
+      const y = comparavel(valorDe(b.dados, r.campo));
       return (x > y ? 1 : x < y ? -1 : 0) * (r.dir === 'desc' ? -1 : 1);
     });
   }
   const lim = consulta.restricoes.find((x) => x.tipo === 'limit');
-  return lim ? docs.slice(0, lim.n) : docs;
+  return (lim ? itens.slice(0, lim.n) : itens).map(({ caminho }) => instantaneo(caminho));
 }
 
 export const getDoc = async (ref) => (await pausa(), instantaneo(ref.path));
@@ -171,7 +235,7 @@ export const onSnapshot = (consulta, aoMudar, aoFalhar) => {
 export const setDoc = async (ref, dados) => {
   await pausa();
   store.set(ref.path, resolver(clonar(dados)));
-  salvar();
+  await salvar();
 };
 export const addDoc = async (col, dados) => {
   const ref = doc(col);
@@ -182,16 +246,16 @@ export const updateDoc = async (ref, campos) => {
   await pausa();
   if (!store.has(ref.path)) throw new Error(`NOT_FOUND: ${ref.path}`);
   escreverCampos(store.get(ref.path), campos);
-  salvar();
+  await salvar();
 };
 export const deleteDoc = async (ref) => {
   await pausa();
   store.delete(ref.path);
-  salvar();
+  await salvar();
 };
 
 /** Aplica uma lista de escritas de uma vez: se alguma falhar na validação, nenhuma é aplicada. */
-function aplicarEscritas(escritas) {
+async function aplicarEscritas(escritas) {
   if (escritas.length > 500) throw new Error('Uma transação/lote do Firestore aceita no máximo 500 escritas.');
   const existe = new Set(store.keys());
   for (const e of escritas) {
@@ -203,7 +267,7 @@ function aplicarEscritas(escritas) {
     else if (e.op === 'update') escreverCampos(store.get(e.ref.path), e.campos);
     else store.delete(e.ref.path);
   }
-  salvar();
+  await salvar();
 }
 
 export async function runTransaction(_db, fn) {
@@ -219,7 +283,7 @@ export async function runTransaction(_db, fn) {
     delete: (ref) => (escritas.push({ op: 'delete', ref }), tx),
   };
   const resultado = await fn(tx); // se lançar, nada é aplicado
-  aplicarEscritas(escritas);
+  await aplicarEscritas(escritas);
   return resultado;
 }
 
@@ -271,8 +335,66 @@ export async function signOut() {
 export const sendPasswordResetEmail = async () => pausa(250); // não envia e-mail nenhum
 
 // ---------------------------------------------------------------------------
-// Avisos na tela: faixa de modo dev e atalhos de login
+// Gestão dos dados guardados no navegador (só existe no modo local; o Firebase de verdade não tem isto)
 // ---------------------------------------------------------------------------
+const nomeDoBackup = () => `fudev-backup-${new Date().toISOString().slice(0, 10)}.json`;
+
+export const dev = {
+  /** 'exemplo' (dados fictícios) ou 'local' (dados de verdade deste navegador). */
+  origem: () => origem,
+
+  /** Apaga TUDO, menos a equipe das contas de teste, e passa a tratar os dados como de verdade (nunca mais refeitos). */
+  async limparDados() {
+    for (const caminho of [...store.keys()]) if (!caminho.startsWith('users/')) store.delete(caminho);
+    origem = 'local';
+    atualizarFaixa();
+    await salvar();
+  },
+
+  /** O banco inteiro como texto JSON (para guardar num arquivo). */
+  backup: () => JSON.stringify({ app: 'fudev', formato: 1, origem, docs: [...store] }, substituto),
+
+  baixarBackup() {
+    baixarArquivo(nomeDoBackup(), dev.backup(), 'application/json');
+  },
+
+  /** Troca TODOS os dados pelos de um backup. Recusa arquivos que não sejam um backup do FUDEV. */
+  async restaurarBackup(texto) {
+    let lido;
+    try {
+      lido = JSON.parse(texto, reviver);
+    } catch {
+      throw new Error('O arquivo não é um backup válido.');
+    }
+    if (lido?.app !== 'fudev' || !Array.isArray(lido.docs)) throw new Error('O arquivo não é um backup do FUDEV.');
+    store.clear();
+    lido.docs.forEach(([caminho, dados]) => store.set(caminho, dados));
+    if (![...store.keys()].some((c) => c.startsWith('users/'))) semearEquipe(store, Timestamp); // sem equipe ninguém consegue entrar
+    origem = 'local';
+    atualizarFaixa();
+    await salvar();
+  },
+};
+
+/** Apaga os dados guardados e recarrega: volta ao cenário de exemplo. */
+async function restaurarDadosDeExemplo() {
+  if (banco) await gravarRegistro(null).catch(() => {});
+  location.reload();
+}
+
+// ---------------------------------------------------------------------------
+// Avisos na tela: faixa do modo local e atalhos de login
+// ---------------------------------------------------------------------------
+function atualizarFaixa() {
+  const faixa = document.getElementById('dev-faixa');
+  if (!faixa) return;
+  const exemplo = origem === 'exemplo';
+  faixa.querySelector('span').textContent = exemplo
+    ? 'MODO DESENVOLVIMENTO · dados de exemplo neste navegador'
+    : 'MODO LOCAL · seus dados ficam só neste navegador';
+  faixa.querySelector('button').textContent = exemplo ? 'Restaurar dados' : 'Baixar backup';
+}
+
 function montarInterfaceDev() {
   const estilo = document.createElement('style');
   estilo.textContent = `
@@ -294,11 +416,13 @@ function montarInterfaceDev() {
 
   const faixa = document.createElement('div');
   faixa.id = 'dev-faixa';
-  faixa.innerHTML = '<span>MODO DESENVOLVIMENTO · dados de exemplo neste navegador</span><button type="button">Restaurar dados</button>';
+  faixa.innerHTML = '<span></span><button type="button"></button>';
   faixa.querySelector('button').addEventListener('click', () => {
+    if (origem === 'local') return dev.baixarBackup();
     if (confirm('Apagar as alterações feitas em teste e voltar aos dados de exemplo?')) restaurarDadosDeExemplo();
   });
   document.body.append(faixa);
+  atualizarFaixa();
 
   // na tela de login: um botão por conta de desenvolvimento
   const formulario = document.getElementById('form-login');

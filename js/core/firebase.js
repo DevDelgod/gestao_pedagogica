@@ -38,6 +38,12 @@ async function carregarSdkReal() {
 
 const sdk = modoDesenvolvimento ? await import('../dev/firebase-fake.js') : await carregarSdkReal();
 
+/**
+ * Só existe no modo local (Firebase simulado): backup, restauração e limpeza dos dados guardados no navegador.
+ * Com o Firebase de verdade vale undefined, e as telas escondem essas opções.
+ */
+export const { dev } = sdk;
+
 export const {
   app,
   auth,

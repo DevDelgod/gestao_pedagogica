@@ -12,15 +12,22 @@ import { PAPEIS } from '../models/schema.js';
 
 const GESTAO = [PAPEIS.ADMIN, PAPEIS.COORDENADOR];
 
+/**
+ * `oculto`: a tela existe, mas não aparece no menu. Este sistema é SECUNDÁRIO: a seleção (editais, inscrições,
+ * sorteio) acontece no sistema oficial, e aqui entram as exportações dele. As telas ficam prontas no código,
+ * para voltar ao menu se um dia a seleção for feita por aqui.
+ */
 const MENU = [
   { id: 'dashboard', rotulo: 'Painel', pronto: true },
+  { id: 'analises', rotulo: 'Análises', pronto: true, papeis: GESTAO },
+  { id: 'importar', rotulo: 'Importar dados', pronto: true, papeis: GESTAO },
   { id: 'cursos', rotulo: 'Cursos', pronto: true, papeis: GESTAO },
   { id: 'turmas', rotulo: 'Turmas', pronto: true, papeis: GESTAO },
-  { id: 'editais', rotulo: 'Editais', pronto: true, papeis: GESTAO },
-  { id: 'inscricoes', rotulo: 'Inscrições', pronto: true, papeis: GESTAO },
   { id: 'alunos', rotulo: 'Alunos', pronto: true, papeis: GESTAO },
   { id: 'diario', rotulo: 'Diário de classe', pronto: true }, // todos os papéis: o professor usa aqui
   { id: 'avaliacoes', rotulo: 'Avaliações', pronto: true }, // todos os papéis: o professor lança as notas aqui
+  { id: 'editais', rotulo: 'Editais', pronto: true, papeis: GESTAO, oculto: true },
+  { id: 'inscricoes', rotulo: 'Inscrições', pronto: true, papeis: GESTAO, oculto: true },
 ];
 
 /**
@@ -28,7 +35,7 @@ const MENU = [
  * Preenche o <aside id="sidebar"> da página.
  */
 export function montarShell({ ativo, perfil }) {
-  const itens = MENU.filter((item) => !item.papeis || item.papeis.includes(perfil.papel))
+  const itens = MENU.filter((item) => !item.oculto && (!item.papeis || item.papeis.includes(perfil.papel)))
     .map(({ id, rotulo, pronto }) =>
       pronto
         ? `<a class="nav__item" href="${id}.html" ${id === ativo ? 'aria-current="page"' : ''}>${rotulo}</a>`

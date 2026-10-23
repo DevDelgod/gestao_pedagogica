@@ -41,23 +41,34 @@ export async function buscarAlunoPorEmail(email) {
  * Devolve o id.
  */
 export async function salvarAluno(alunoId, entrada) {
-  const { dados, erro } = validarAluno(entrada, { hoje: hojeISO() });
+  const alunos = await alunosRepo.listar();
+  const atual = alunoId ? alunos.find((a) => a.id === alunoId) : null;
+  if (alunoId && !atual) throw new ErroDeNegocio('nao-encontrado', 'Aluno não encontrado.');
+
+  const { dados, erro } = validarAluno(entrada, {
+    hoje: hojeISO(),
+    cpfJaGravado: atual?.cpf ?? '',
+    exigirResponsavel: atual?.origem !== 'importacao', // quem veio do sistema oficial pode não ter responsável cadastrado
+  });
   if (erro) throw new ErroDeNegocio('dados-invalidos', erro);
 
-  const alunos = await alunosRepo.listar();
-  if (alunoId && !alunos.some((a) => a.id === alunoId)) throw new ErroDeNegocio('nao-encontrado', 'Aluno não encontrado.');
+  // só confere duplicidade do que mudou: pessoas importadas podem dividir e-mail (família) sem travar a edição
   const outros = alunos.filter((a) => a.id !== alunoId);
-  if (dados.email && outros.some((a) => a.email === dados.email)) {
+  if (dados.email && dados.email !== atual?.email && outros.some((a) => a.email === dados.email)) {
     throw new ErroDeNegocio('email-duplicado', 'Já existe um aluno com este e-mail.');
   }
-  if (dados.cpf && outros.some((a) => a.cpf === dados.cpf)) {
+  if (dados.cpf && dados.cpf !== atual?.cpf && outros.some((a) => a.cpf === dados.cpf)) {
     throw new ErroDeNegocio('cpf-duplicado', 'Já existe um aluno com este CPF.');
   }
 
   if (!alunoId) return alunosRepo.criar(novoAluno({ ...dados, status: STATUS_ALUNO.INATIVO }));
 
+  // a ficha só edita cidade e bairro (e pode esvaziá-los): o CEP, a rua e o estado que vieram da importação ficam como estão
+  const endereco = { ...atual.endereco, cidade: dados.endereco?.cidade ?? '', bairro: dados.endereco?.bairro ?? '' };
+  dados.endereco = Object.values(endereco).some(Boolean) ? endereco : null;
+
   const depois = nomeExibicao(dados);
-  if (nomeExibicao(alunos.find((a) => a.id === alunoId)) === depois) {
+  if (nomeExibicao(atual) === depois) {
     await alunosRepo.atualizar(alunoId, dados);
     return alunoId;
   }

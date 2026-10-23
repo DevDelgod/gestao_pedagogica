@@ -17,22 +17,10 @@ const METRICAS = [
   { chave: 'turmasEmAndamento', rotulo: 'Turmas em andamento', href: 'turmas.html' },
   { chave: 'matriculasAtivas', rotulo: 'Matrículas ativas', href: 'alunos.html' },
   {
-    chave: 'aguardandoSelecao',
-    rotulo: 'Inscrições aguardando seleção',
-    dica: 'ainda não passaram pela seleção',
-    href: 'inscricoes.html',
-  },
-  {
-    chave: 'aMatricular',
-    rotulo: 'Convocados a matricular',
-    dica: 'com vaga reservada',
-    href: 'inscricoes.html',
-    tom: (n) => (n > 0 ? 'atencao' : ''),
-  },
-  {
     chave: 'emRisco',
     rotulo: 'Alunos em risco de evasão',
     dica: 'faltas seguidas ou frequência baixa',
+    href: 'analises.html#frequencia',
     tom: (n) => (n > 0 ? 'atencao' : ''),
   },
   {
@@ -42,11 +30,10 @@ const METRICAS = [
   },
 ];
 
-// O professor não lê inscrições (firestore.rules) nem acessa as telas de gestão: para ele, o painel
-// mostra só os números que pode ver, sem links, e um atalho para o Diário de classe.
-const exibidas = ehProfessor
-  ? METRICAS.filter((m) => !['aguardandoSelecao', 'aMatricular'].includes(m.chave)).map(({ href, ...resto }) => resto)
-  : METRICAS;
+// As inscrições e a seleção acontecem no sistema oficial (as telas de edital ficam fora do menu), então o painel
+// não conta mais inscrições. O professor não acessa as telas de gestão: para ele, o painel mostra os números sem
+// links, e um atalho para o Diário de classe.
+const exibidas = ehProfessor ? METRICAS.map(({ href, ...resto }) => resto) : METRICAS;
 $('#atalho-professor').hidden = !ehProfessor;
 
 const painel = $('#metricas');
@@ -67,7 +54,7 @@ const cartao = ({ rotulo, dica, href }, valor, tom = '') => {
 async function carregar() {
   painel.innerHTML = exibidas.map((m) => cartao(m, null)).join('');
   try {
-    const resumo = await carregarResumo({ incluirInscricoes: !ehProfessor });
+    const resumo = await carregarResumo({ incluirInscricoes: false });
     painel.innerHTML = exibidas.map((m) => {
       const n = resumo[m.chave];
       return cartao(m, m.formato ? m.formato(n) : n, m.tom?.(n));

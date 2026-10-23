@@ -140,6 +140,17 @@ service cloud.firestore {
       allow delete: if ehGestao();
     }
 
+    // ---------- importação das planilhas do sistema oficial ----------
+    match /importacoes/{id} {
+      allow read: if ehEquipe();
+      allow write: if ehGestao();
+    }
+
+    match /configuracoes/{id} {
+      allow read: if ehEquipe();
+      allow write: if ehGestao();
+    }
+
     // Todo o resto: negado por padrão.
   }
 }

@@ -108,16 +108,20 @@ function turmaHtml(t) {
   const dias = (t.diasSemana ?? []).map((d) => ROTULO_DIA[d].slice(0, 3)).join(', ');
   const horario = t.horarioInicio ? `${t.horarioInicio}–${t.horarioFim}` : '';
   const periodo = t.dataInicio || t.dataFim ? `${t.dataInicio ? formatarData(t.dataInicio) : '…'} a ${t.dataFim ? formatarData(t.dataFim) : '…'}` : '';
-  const agenda = [dias, horario, periodo].filter(Boolean).join(' · ') || 'Dias e horário ainda não definidos';
+  const agenda = [dias, horario, periodo].filter(Boolean).join(' · ') || t.horarioTexto || 'Dias e horário ainda não definidos';
   const livres = Math.max(0, vagasLivres(t));
+  // turma importada do sistema oficial: o número de vagas é só o de matrículas que vieram, não a capacidade real
+  const vagas = t.origem === 'importacao'
+    ? `Importada do sistema oficial · <strong>${t.vagasOcupadas}</strong> matrícula(s) ativa(s)`
+    : `Vagas: <strong>${t.vagas}</strong> · ${t.vagasOcupadas} matriculado(s) · ${t.vagasReservadas ?? 0} convocado(s) · ${livres} livre(s)`;
 
   return `
     <article class="cartao item" data-id="${escapar(t.id)}">
       <div class="item__principal">
         <h2 class="item__titulo">${escapar(t.nome)} <span class="selo ${SELO_STATUS[t.status]}">${ROTULO_STATUS_TURMA[t.status]}</span></h2>
-        <p class="item__meta"><strong>${escapar(t.cursoNome)}</strong> · ${t.professorNome ? `Professor: ${escapar(t.professorNome)}` : 'Sem professor definido'}</p>
+        <p class="item__meta"><strong>${escapar(t.cursoNome)}</strong>${t.periodo ? ` · ${escapar(t.periodo)}` : ''}${t.polo ? ` · ${escapar(t.polo)}` : ''} · ${t.professorNome ? `Professor: ${escapar(t.professorNome)}` : 'Sem professor definido'}</p>
         <p class="item__meta">${escapar(agenda)}</p>
-        <p class="item__meta">Vagas: <strong>${t.vagas}</strong> · ${t.vagasOcupadas} matriculado(s) · ${t.vagasReservadas ?? 0} convocado(s) · ${livres} livre(s)</p>
+        <p class="item__meta">${vagas}</p>
       </div>
       <div class="item__acoes">
         <button class="botao botao--fantasma" type="button" data-acao="editar">Editar</button>

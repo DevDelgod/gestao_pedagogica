@@ -90,7 +90,8 @@ function alunosVisiveis() {
       normalizar(a.nome).includes(termo) ||
       normalizar(a.nomeSocial).includes(termo) || // acha pelo nome social e pelo civil
       normalizar(a.email).includes(termo) ||
-      (digitos.length >= 3 && (a.cpf ?? '').includes(digitos))
+      (digitos.length >= 3 && (a.cpf ?? '').includes(digitos)) ||
+      matriculasDe(a.id).some((m) => normalizar(m.numeroInscricao).includes(termo)) // número de inscrição, ex.: QM05075
     );
   });
 }
@@ -100,7 +101,7 @@ function renderizarLista() {
   $('#contagem').textContent = `${alunos.length} de ${estado.alunos.length} aluno(s)`;
   lista.innerHTML = alunos.length
     ? alunos.map(alunoHtml).join('')
-    : `<p class="estado-vazio">${estado.alunos.length ? 'Nenhum aluno com estes filtros.' : 'Nenhum aluno ainda. Eles aparecem ao efetivar matrículas de um edital, ou clique em "Novo aluno".'}</p>`;
+    : `<p class="estado-vazio">${estado.alunos.length ? 'Nenhum aluno com estes filtros.' : 'Nenhum aluno ainda. Importe a listagem do sistema oficial em "Importar dados", ou clique em "Novo aluno".'}</p>`;
 }
 
 function alunoHtml(a) {
@@ -207,11 +208,31 @@ function renderizarFicha() {
   const salvo = Boolean(a && estado.alunoId);
   $('#ficha-matriculas').hidden = !salvo;
   $('#ficha-documentos').hidden = !salvo;
+  renderizarDadosOficiais(salvo ? a : null);
   $('#ficha-sub').textContent = salvo ? `Situação: ${ROTULO_STATUS_ALUNO[a.status]}. A situação do aluno é calculada a partir das matrículas.` : 'Depois de salvar o cadastro, você poderá matricular o aluno e anexar documentos.';
   if (!salvo) return;
   $('#ficha-titulo').textContent = nomeExibicao(a);
   renderizarMatriculas(a);
   renderizarDocumentos(a);
+}
+
+/** "Sim · Bolsa Família", "Não", ou vazio quando a planilha não disse nada. */
+const opcaoComDetalhe = (opcao) => (opcao ? `${opcao.possui ? 'Sim' : 'Não'}${opcao.qual ? ` · ${opcao.qual}` : ''}` : '');
+
+/** O que veio da importação e a ficha não edita: identificação, perfil e o endereço completo. Some se não há nada. */
+function renderizarDadosOficiais(a) {
+  const e = a?.endereco ?? {};
+  const linhas = [
+    ['Id do candidato', a?.idExterno],
+    ['Raça ou cor', a?.raca],
+    ['Possui deficiência', opcaoComDetalhe(a?.deficiencia)],
+    ['Programa social', opcaoComDetalhe(a?.programaSocial)],
+    ['Reside em MCMV', opcaoComDetalhe(a?.mcmv)],
+    ['WhatsApp', a?.whatsapp],
+    ['Endereço', [e.rua, e.bairro, e.cidade && e.estado ? `${e.cidade}/${e.estado}` : e.cidade || e.estado, e.cep].filter(Boolean).join(', ')],
+  ].filter(([, valor]) => valor);
+  $('#ficha-oficial').hidden = !linhas.length;
+  $('#dados-oficiais').innerHTML = linhas.map(([rotulo, valor]) => `<dt>${rotulo}</dt><dd>${escapar(valor)}</dd>`).join('');
 }
 
 // --- cadastro ---
@@ -278,7 +299,7 @@ function matriculaHtml(m) {
     <div class="subitem">
       <div class="subitem__texto">
         <strong>${escapar(m.turmaNome)} <span class="selo ${SELO_MATRICULA[m.status]}">${ROTULO_STATUS_MATRICULA[m.status]}</span>${m.riscoEvasao && m.status === M.ATIVA ? ' <span class="selo selo--atencao">Risco de evasão</span>' : ''}</strong>
-        <span class="item__meta">${escapar(m.cursoNome)} · matriculado em ${formatarData(m.dataMatricula)}</span>
+        <span class="item__meta">${escapar(m.cursoNome)} · matriculado em ${formatarData(m.dataMatricula)}${m.numeroInscricao ? ` · inscrição ${escapar(m.numeroInscricao)}` : ''}${m.statusExterno ? ` · no sistema oficial: ${escapar(m.statusExterno)}` : ''}</span>
         <span class="item__meta">${freq}${desempenho}</span>
         ${m.motivoSituacao ? `<span class="item__meta">Motivo: ${escapar(m.motivoSituacao)}</span>` : ''}
       </div>

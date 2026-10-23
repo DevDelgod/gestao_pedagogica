@@ -26,6 +26,8 @@ export const COLECOES = Object.freeze({
   AVALIACOES: 'avaliacoes', // avaliações + notas
   EDITAIS: 'editais', // processos seletivos (inscrição → seleção → matrícula)
   SELECOES: 'selecoes', // registro auditável de cada sorteio/classificação executado
+  IMPORTACOES: 'importacoes', // histórico das planilhas importadas do sistema oficial
+  CONFIGURACOES: 'configuracoes', // preferências do sistema (ex.: como traduzir as situações das planilhas)
 });
 
 // ---------------------------------------------------------------------------
@@ -213,6 +215,11 @@ export const novaTurma = (d) => ({
   dataInicio: d.dataInicio ?? null, // 'AAAA-MM-DD'
   dataFim: d.dataFim ?? null,
   status: d.status ?? STATUS_TURMA.PLANEJADA,
+  // vindos da importação do sistema oficial (turmas criadas à mão deixam em branco)
+  polo: d.polo ?? '', // onde as aulas acontecem, ex.: "Sede da Incubadora"
+  periodo: d.periodo ?? '', // ex.: "2026.1"
+  horarioTexto: d.horarioTexto ?? '', // o horário como o sistema oficial escreve, ex.: "Terça, Quarta e Quinta-feira - 18:00 às 21:00"
+  origem: d.origem ?? 'manual', // 'manual' | 'importacao'
 });
 
 /** alunos/{alunoId} */
@@ -226,10 +233,18 @@ export const novoAluno = (d) => ({
   cpf: d.cpf ?? '',
   dataNascimento: d.dataNascimento ?? null, // 'AAAA-MM-DD'
   responsavel: d.responsavel ?? null, // { nome, telefone, parentesco } — para menores
-  endereco: d.endereco ?? null, // { cidade, bairro, ... }
+  endereco: d.endereco ?? null, // { cep, rua, bairro, cidade, estado }
   documentos: d.documentos ?? [], // [{ nome, url, publicId, tipo, bytes }] — vindos do Cloudinary
   observacoes: d.observacoes ?? '',
   status: d.status ?? STATUS_ALUNO.ATIVO,
+  // perfil e identificação vindos da importação do sistema oficial
+  whatsapp: d.whatsapp ?? '',
+  raca: d.raca ?? '', // como declarada no cadastro oficial, ex.: "Parda"
+  deficiencia: d.deficiencia ?? null, // { possui: true | false | null, qual }
+  programaSocial: d.programaSocial ?? null, // { possui, qual }, ex.: Bolsa Família
+  mcmv: d.mcmv ?? null, // { possui, qual }: reside em empreendimento do Minha Casa Minha Vida
+  idExterno: d.idExterno ?? null, // "Id do candidato" no sistema oficial: é com ele que uma reimportação acha a mesma pessoa
+  origem: d.origem ?? 'manual', // 'manual' | 'importacao'
 });
 
 /**
@@ -302,6 +317,11 @@ export const novaMatricula = (d) => ({
   riscoEvasao: false, // idem
   media: null, // média ponderada atual (0–10) das avaliações por nota; null = ainda sem notas
   aptidao: null, // { avaliadas, aptas, naoAptas } das avaliações Apto / Não apto; null = ainda sem resultados
+  // vindos da importação do sistema oficial
+  numeroInscricao: d.numeroInscricao ?? null, // ex.: "QM05075": liga esta matrícula às linhas das planilhas de frequência
+  statusExterno: d.statusExterno ?? null, // a situação como o sistema oficial escreve, ex.: "Ativo"
+  dataInscricao: d.dataInscricao ?? null, // 'AAAA-MM-DD'
+  origem: d.origem ?? 'manual', // 'manual' | 'importacao'
 });
 
 /** aulas/{turmaId_data} — uma chamada inteira cabe em UM documento. */

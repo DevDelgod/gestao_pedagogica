@@ -1,0 +1,6 @@
+# Exportações reais do sistema oficial têm dados pessoais de verdade (nome, CPF, raça, deficiência…).
+# Nunca vão para o Git: coloque os arquivos em dados/ (ou deixe planilhas em qualquer lugar do projeto).
+dados/
+*.xlsx
+*.xls
+*.csv

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Análises · FUDEV</title>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/base.css" />
+    <link rel="stylesheet" href="../css/components.css" />
+    <noscript><style>body[data-auth] { visibility: visible; }</style></noscript>
+  </head>
+  <body data-auth="pending">
+    <div class="app">
+      <aside class="sidebar" id="sidebar"></aside>
+
+      <main class="principal">
+        <header class="topo">
+          <h1>Análises</h1>
+          <p class="topo__sub">Números sobre inscrições, perfil, frequência e evasão. Tudo muda conforme os filtros.</p>
+        </header>
+
+        <form class="barra" id="filtros" aria-label="Filtros">
+          <div class="campo">
+            <label for="f-periodo">Período</label>
+            <select id="f-periodo"></select>
+          </div>
+          <div class="campo">
+            <label for="f-curso">Curso</label>
+            <select id="f-curso"></select>
+          </div>
+          <div class="campo">
+            <label for="f-polo">Polo</label>
+            <select id="f-polo"></select>
+          </div>
+          <div class="campo">
+            <label for="f-turma">Turma</label>
+            <select id="f-turma"></select>
+          </div>
+          <div class="campo">
+            <label for="f-situacao">Situação da matrícula</label>
+            <select id="f-situacao"></select>
+          </div>
+        </form>
+        <p class="item__meta filtros-resumo" id="filtros-resumo" aria-live="polite"></p>
+
+        <div class="abas" role="tablist" aria-label="Análises" id="abas">
+          <button class="aba" type="button" role="tab" data-aba="funil" aria-selected="true">Funil</button>
+          <button class="aba" type="button" role="tab" data-aba="perfil" aria-selected="false">Perfil</button>
+          <button class="aba" type="button" role="tab" data-aba="frequencia" aria-selected="false">Frequência e evasão</button>
+          <button class="aba" type="button" role="tab" data-aba="comparar" aria-selected="false">Comparar</button>
+        </div>
+
+        <p class="aviso" id="erro" role="alert" hidden></p>
+        <section id="conteudo" role="tabpanel" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <script type="module" src="../js/pages/analises.js"></script>
+  </body>
+</html>

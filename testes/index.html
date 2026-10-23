@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Testes · FUDEV</title>
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/base.css" />
+    <style>
+      main { max-width: 860px; margin: 0 auto; padding: var(--espaco-5) var(--espaco-4); }
+      h1 { margin-bottom: var(--espaco-1); }
+      .resumo { margin: var(--espaco-3) 0 var(--espaco-5); padding: var(--espaco-3) var(--espaco-4); border-radius: var(--raio); font-weight: 700; }
+      .resumo--ok { background: var(--cor-sucesso-fundo); color: var(--cor-sucesso); }
+      .resumo--falha { background: var(--cor-erro-fundo); color: var(--cor-erro); }
+      h2 { margin: var(--espaco-5) 0 var(--espaco-2); font-size: 1.05rem; }
+      ul { margin: 0; padding: 0; list-style: none; }
+      li { padding: var(--espaco-1) 0; }
+      .ok::before { content: '✓ '; color: var(--cor-sucesso); font-weight: 700; }
+      .falha::before { content: '✗ '; color: var(--cor-erro); font-weight: 700; }
+      .erro { display: block; margin: 2px 0 var(--espaco-2) var(--espaco-4); color: var(--cor-erro); font-size: 0.9rem; overflow-wrap: anywhere; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Testes</h1>
+      <p>Rodam aqui no navegador, só com código puro: não encostam nos dados guardados do sistema.</p>
+      <p class="resumo" id="resumo">Rodando…</p>
+      <div id="resultado"></div>
+    </main>
+
+    <script type="module">
+      import { rodarTodos } from './lib.js';
+      import './planilha.teste.js';
+      import './importacao.teste.js';
+      import './cadastros.teste.js';
+      import './avaliacoes.teste.js';
+      import './analises.teste.js';
+
+      const resultados = await rodarTodos();
+      const falhas = resultados.filter((r) => !r.ok);
+      const escapar = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+
+      const grupos = Map.groupBy(resultados, (r) => r.grupo);
+      document.getElementById('resultado').innerHTML = [...grupos]
+        .map(
+          ([nome, itens]) =>
+            `<h2>${escapar(nome)}</h2><ul>${itens
+              .map((r) => `<li class="${r.ok ? 'ok' : 'falha'}">${escapar(r.nome)}${r.ok ? '' : `<span class="erro">${escapar(r.erro)}</span>`}</li>`)
+              .join('')}</ul>`,
+        )
+        .join('');
+
+      const resumo = document.getElementById('resumo');
+      resumo.textContent = falhas.length ? `${falhas.length} de ${resultados.length} testes falharam` : `Todos os ${resultados.length} testes passaram`;
+      resumo.className = `resumo ${falhas.length ? 'resumo--falha' : 'resumo--ok'}`;
+      document.title = `${falhas.length ? '✗' : '✓'} Testes · FUDEV`;
+      window.__testes = { total: resultados.length, falhas: falhas.map((f) => `${f.grupo} › ${f.nome}: ${f.erro}`) };
+    </script>
+  </body>
+</html>

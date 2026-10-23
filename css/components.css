@@ -698,6 +698,251 @@ a.botao {
   color: var(--cor-atencao);
 }
 
+/* ---------- importação e análises: blocos, tabelas, barras ---------- */
+.bloco {
+  display: grid;
+  gap: var(--espaco-3);
+  margin-bottom: var(--espaco-4);
+}
+
+.bloco h2 {
+  font-size: 1.1rem;
+}
+
+.bloco p {
+  margin: 0;
+}
+
+.area-arquivo {
+  display: grid;
+  gap: var(--espaco-1);
+  justify-items: center;
+  padding: var(--espaco-6) var(--espaco-4);
+  border: 2px dashed var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-fundo);
+  text-align: center;
+  cursor: pointer;
+}
+
+.area-arquivo:hover,
+.area-arquivo--sobre {
+  border-color: var(--cor-primaria);
+  background: var(--cor-superficie-2);
+}
+
+.tabela-rolagem {
+  overflow-x: auto;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.tabela th,
+.tabela td {
+  padding: var(--espaco-2) var(--espaco-3);
+  border-bottom: 1px solid var(--cor-borda);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.tabela th {
+  color: var(--cor-texto-suave);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* nomes longos (turma, curso, polo) ficam legíveis: a tabela rola de lado em vez de espremer a primeira coluna */
+.tabela th:first-child,
+.tabela td:first-child {
+  min-width: 220px;
+}
+
+.tabela .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tabela tbody tr:hover {
+  background: var(--cor-superficie-2);
+}
+
+.tabela select {
+  min-height: 34px;
+  padding: 0 var(--espaco-2);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font: inherit;
+}
+
+.tabela select[aria-invalid='true'] {
+  border-color: var(--cor-erro);
+  background: var(--cor-erro-fundo);
+}
+
+.avisos {
+  display: grid;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.avisos li {
+  padding: var(--espaco-2) var(--espaco-3);
+  border-radius: var(--raio);
+  background: var(--cor-atencao-fundo);
+  color: var(--cor-atencao);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.avisos .info {
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto-suave);
+}
+
+progress {
+  width: 100%;
+  height: 10px;
+  accent-color: var(--cor-primaria);
+}
+
+.numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--espaco-3);
+}
+
+.numero {
+  display: grid;
+  gap: 2px;
+  padding: var(--espaco-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+}
+
+.numero strong {
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+.numero span {
+  color: var(--cor-texto-suave);
+  font-size: 0.85rem;
+}
+
+.filtros-resumo {
+  margin: calc(var(--espaco-2) * -1) 0 var(--espaco-4);
+}
+
+.analise-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: var(--espaco-4);
+  margin-bottom: var(--espaco-4);
+}
+
+.analise-grade > .bloco {
+  margin-bottom: 0;
+}
+
+.bloco__topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espaco-2) var(--espaco-4);
+}
+
+.bloco h3 {
+  font-size: 1rem;
+}
+
+/* barras horizontais: a largura é a porcentagem do total */
+.barras {
+  display: grid;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.barras li {
+  display: grid;
+  grid-template-columns: minmax(90px, 38%) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: 0.9rem;
+}
+
+.barras__rotulo {
+  overflow-wrap: anywhere;
+}
+
+.barras__trilho {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--cor-superficie-2);
+  overflow: hidden;
+}
+
+.barras__preenchimento {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 999px;
+  background: var(--cor-primaria);
+}
+
+.barras__preenchimento--atencao {
+  background: var(--cor-atencao);
+}
+
+.barras__valor {
+  color: var(--cor-texto-suave);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.barras .vazio .barras__preenchimento {
+  background: var(--cor-borda);
+}
+
+/* gráfico de linha em SVG */
+.grafico {
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+}
+
+.grafico__grade {
+  stroke: var(--cor-borda);
+  stroke-width: 1;
+}
+
+.grafico__linha {
+  fill: none;
+  stroke: var(--cor-primaria);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+.grafico__ponto {
+  fill: var(--cor-primaria);
+}
+
+.grafico__texto {
+  fill: var(--cor-texto-suave);
+  font-size: 12px;
+}
+
 /* ---------- avaliações: lançamento de notas e de Apto / Não apto ---------- */
 .marca--texto {
   min-width: 92px;

@@ -24,7 +24,7 @@ export const CONTAS_DEV = [
     email: 'coordenacao@dev.local',
     senha: 'dev12345',
     papel: 'coordenador',
-    descricao: 'Editais, inscrições e matrículas.',
+    descricao: 'Importar dados, análises, cursos, turmas e alunos.',
   },
   {
     uid: 'dev-prof',
@@ -32,12 +32,20 @@ export const CONTAS_DEV = [
     email: 'professor@dev.local',
     senha: 'dev12345',
     papel: 'professor',
-    descricao: 'Só o painel: não acessa editais nem inscrições.',
+    descricao: 'Diário de classe e avaliações das próprias turmas.',
   },
 ];
 
 const MIN = 60 * 1000;
 const DIA = 24 * 60 * MIN;
+
+/** A equipe (users/{uid}) das contas de desenvolvimento. É a única parte que sobra ao limpar os dados de exemplo. */
+export function semearEquipe(store, Timestamp) {
+  const quando = new Timestamp(Date.now() - 60 * DIA);
+  CONTAS_DEV.forEach((c) =>
+    store.set(`users/${c.uid}`, { nome: c.nome, email: c.email, papel: c.papel, ativo: true, criadoEm: quando, atualizadoEm: quando }),
+  );
+}
 
 /** Cenário: um edital em cada etapa, turmas, alunos e matrículas para o painel ter o que mostrar. */
 export function semear(store, Timestamp) {
@@ -45,10 +53,7 @@ export function semear(store, Timestamp) {
   const ts = (ms) => new Timestamp(ms);
   const auditoria = (diasAtras) => ({ criadoEm: ts(agora - diasAtras * DIA), atualizadoEm: ts(agora - diasAtras * DIA) });
 
-  // --- equipe (users/{uid}) ---
-  CONTAS_DEV.forEach((c) =>
-    store.set(`users/${c.uid}`, { nome: c.nome, email: c.email, papel: c.papel, ativo: true, ...auditoria(60) }),
-  );
+  semearEquipe(store, Timestamp);
 
   // --- cursos e turmas ---
   // modoAvaliacao é só a forma SUGERIDA ao criar uma avaliação ('nota' ou 'apto'): cada avaliação escolhe a sua

@@ -15,6 +15,8 @@ selecoes/{editalId_turmaId}         registro auditável do sorteio/classificaç�
 matriculas/{turmaId_alunoId}        aluno ↔ turma  (+ resumo de frequência e média)
 aulas/{turmaId_AAAA-MM-DD}          diário de classe + chamada do dia
 avaliacoes/{avaliacaoId}            avaliação da turma + notas de todos
+importacoes/{importacaoId}          histórico das planilhas importadas do sistema oficial
+configuracoes/importacao            como traduzir as situações das planilhas (escolha da equipe)
 ```
 
 ```
@@ -28,7 +30,34 @@ edital ──oferta──▶ turmas
                           └─────▶ remanescente · não selecionada
 ```
 
+## Dados vindos do sistema oficial (importação)
+
+Este sistema é **secundário**: as pessoas, matrículas e a chamada chegam por planilhas exportadas do sistema oficial (regras em `js/domain/importacao.js`, gravação em `js/services/importacao.service.js`). O que a importação acrescenta ao modelo:
+
+| Onde | Campo | O que é |
+|---|---|---|
+| `alunos` | `idExterno` | o "Id do candidato" do sistema oficial: com ele, reimportar acha a mesma pessoa (senão, CPF e depois e-mail) |
+| `alunos` | `raca`, `deficiencia`, `programaSocial`, `mcmv` | perfil, como declarado no cadastro oficial. As três últimas são `{ possui: true \| false, qual }`; ausente = a planilha não disse |
+| `alunos` | `whatsapp`, `endereco { cep, rua, bairro, cidade, estado }`, `origem` | contato e endereço completos; `origem` é `importacao` ou `manual` |
+| `matriculas` | `numeroInscricao` | ex.: `QM05075`; é por ele que a planilha de frequência acha a matrícula |
+| `matriculas` | `statusExterno`, `dataInscricao`, `origem` | a situação como o sistema oficial escreve ("Ativo"), a data de inscrição e a origem. A nossa `status` é a tradução, escolhida na tela de importação |
+| `turmas` | `polo`, `periodo`, `horarioTexto`, `origem` | onde, quando ("2026.1") e o horário como vem escrito ("Terça, Quarta e Quinta-feira - 18:00 às 21:00"); `diasSemana`, `horarioInicio` e `horarioFim` são lidos desse texto quando dá |
+| `importacoes` | `tipo`, `arquivo`, `resumo`, `avisos` | uma linha por planilha importada (com os avisos) |
+| `configuracoes/importacao` | `mapaStatus` | `{ "ativo": "ativa", "desistente": "evadida" }`: a tradução das situações, para as próximas importações |
+
+**Identificadores estáveis** (é o que torna a reimportação segura): pessoa `cand{idCandidato}` (ou `cpf{cpf}`, ou um resumo do e-mail ou da inscrição, nessa ordem), matrícula `{turmaId}_{alunoId}`, aula `{turmaId}_{AAAA-MM-DD}`, e turma e curso um resumo (FNV-1a) do texto normalizado: turma = período + curso + polo + horário; curso = nome. Mudar a grafia do polo ou do horário na exportação cria **outra turma**; caixa, acento e espaços não mudam nada.
+
+**O que a importação mexe e o que preserva:**
+- Pessoa: grava o que a planilha traz **e não está em branco**; campo em branco não apaga o que já existe. Nome social, gênero, observações e documentos nunca são tocados. A situação da pessoa é recalculada pelas matrículas.
+- Matrícula: grava `status`, `statusExterno`, `numeroInscricao`. Frequência, média e aptidão existentes ficam (a frequência é recalculada pela planilha de frequência).
+- Turma: nova nasce `em_andamento`, com `vagas` igual ao número de matrículas que vieram (o sistema oficial não diz a capacidade: **trate como "quantas pessoas"**, e edite se quiser). Em reimportação só mexe em polo, período, horário, `vagasOcupadas` (= matrículas ativas) e em `vagas` se faltar lugar.
+- Frequência: soma às aulas que já existem (quem não está na planilha continua na aula, e o conteúdo é mantido) e recalcula `frequencia` e `riscoEvasao` de **todas** as matrículas da turma.
+
+**Em lotes:** a importação grava em lotes de 400 escritas (o Firestore aceita 500), na ordem cursos → turmas → pessoas → matrículas. Cada lote é separado: se falhar no meio, importar o mesmo arquivo de novo completa.
+
 ## O processo: inscrição → seleção → matrícula
+
+> **Fora do menu hoje** (o sistema oficial faz a seleção); o modelo abaixo continua valendo para o módulo de editais.
 
 Cada **edital** descreve como a instituição trabalha. O sistema não tem um fluxo fixo: o edital escolhe a **modalidade** de seleção e os **requisitos de matrícula**.
 
